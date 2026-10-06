@@ -13,8 +13,8 @@ Su propósito principal es servir como un banco de pruebas interactivo, programa
 
 ---
 
-## 🚀 Características Principales
-* 🧭 **Visualización en Tiempo Real:** Observa detalladamente cómo exploran el espacio de estados los algoritmos clásicos (**BFS, Dijkstra y A***).
-* 📊 **Panel de Telemetría:** Módulo de estadísticas cyberpunk para recolectar y contrastar las métricas reales de cada búsqueda (nodos expandidos, tiempo de ejecución, costo del camino).
-* 🗺️ **Entorno de Rejilla Editable:** Soporte para mapas dinámicos a través de archivos JSON (`mapas/exploracion.json`) que permiten modificar muros y costes de terreno.
-* 👾 **Comportamiento de Agentes (Enemigos):** Vista dedicada a la persecución de objetivos esquivando obstáculos de forma inteligente.
+## Características Principales
+* **Visualización en Tiempo Real:** Observa detalladamente cómo exploran el espacio de estados los algoritmos clásicos (**BFS, Dijkstra y A***).
+* **Panel de Telemetría:** Módulo de estadísticas cyberpunk para recolectar y contrastar las métricas reales de cada búsqueda (nodos expandidos, tiempo de ejecución, costo del camino).
+* **Entorno de Rejilla Editable:** Soporte para mapas dinámicos a través de archivos JSON (`mapas/exploracion.json`) que permiten modificar muros y costes de terreno.
+* **Comportamiento de Agentes (Enemigos):** Vista dedicada a la persecución de objetivos esquivando obstáculos de forma inteligente.
