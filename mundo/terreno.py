@@ -1,13 +1,4 @@
-"""Tipos de terreno orientados a objetos.
-
-Cada tipo encapsula sus datos fisicos: si se puede pasar, cuanto cuesta
-recorrerlo, que intervalo tienen sus pisadas y que sonido suenan. La velocidad
-no se guarda aparte: se deriva del costo (`factor_vel`), de modo que el costo que
-alimenta a BFS/Dijkstra/A* es la unica fuente de verdad.
-
-Modulo de datos puros, sin pygame, como config.py y paleta.py. El recorte del
-tileset y la carga de sonidos los resuelve catalogo.py, que si importa pygame y
-deja el sonido ya cargado en `Terreno.sonido`.
+"""Tipos de terreno
 """
 
 from config import (

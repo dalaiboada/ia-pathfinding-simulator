@@ -78,7 +78,7 @@ class MapaTerreno:
         self.inicio = None
         self.meta = None
 
-        self.mostrar_rejilla = True
+        self.mostrar_rejilla = False
         self.hover = None
 
         self._imagenes = {}

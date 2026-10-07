@@ -7,6 +7,7 @@ del pavimento. Los puntos de enganche de la busqueda son `marcas`, `inicio` y
 
 from pygame import *
 
+from config import TAM_CELDA
 from .mapa_terreno import MapaTerreno
 
 # IDs de las variantes de pavimento del catalogo por defecto (ver catalogo.py)
@@ -24,14 +25,16 @@ ESQUINA_INF_DER = 9
 class MapaRutas(MapaTerreno):
     """Rejilla del controlador de rutas, lista para que la busqueda la recorra."""
 
-    def __init__(self, ancho, alto, origen_y, tamano_celda):
-        super().__init__(
-            columnas=ancho // tamano_celda,
-            filas=(alto - origen_y) // tamano_celda,
-            tamano_celda=tamano_celda,
-            origen_x=0,
-            origen_y=origen_y,
-        )
+    def __init__(
+        self,
+        columnas,
+        filas,
+        tamano_celda=TAM_CELDA,
+        origen_x=0,
+        origen_y=0,
+        catalogo=None,
+    ):
+        super().__init__(columnas, filas, tamano_celda, origen_x, origen_y, catalogo)
         self.nombre = "rutas"
 
     def manejar_tecla(self, evento):

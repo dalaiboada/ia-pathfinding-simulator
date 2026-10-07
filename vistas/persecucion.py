@@ -12,7 +12,7 @@ from config import (
     LADO_ENEMIGO,
     NUMERO_ENEMIGOS,
     RUTA_JUGADOR,
-    RUTA_MAPA_EXPLORACION,
+    RUTA_MAPA_PERSECUCION,
     TAM_CELDA,
 )
 from dibujo import dibujar_banda_hud
@@ -42,7 +42,6 @@ class VistaPersecucion(Vista):
         super().__init__(juego)
         self.area = Rect(0, ALTO_HUD, ANCHO_VENTANA, ALTO_VENTANA - ALTO_HUD)
         self.mapa = self.cargar_mapa()
-        self.mapa.mostrar_rejilla = False
         self.area_juego = self.mapa.area()
 
         self.selector = self._crear_selector(juego.algoritmo_enemigo)
@@ -60,7 +59,7 @@ class VistaPersecucion(Vista):
 
         try:
             return MapaTerreno.cargar_json(
-                RUTA_MAPA_EXPLORACION,
+                RUTA_MAPA_PERSECUCION,
                 columnas=columnas,
                 filas=filas,
                 tamano_celda=TAM_CELDA,
@@ -68,7 +67,7 @@ class VistaPersecucion(Vista):
                 origen_y=ALTO_HUD,
             )
         except (OSError, ValueError) as error:
-            print(f"[persecucion] no pude leer {RUTA_MAPA_EXPLORACION}: {error}")
+            print(f"[persecucion] no pude leer {RUTA_MAPA_PERSECUCION}: {error}")
             print("[persecucion] uso un escenario de respaldo generado por codigo")
             return self.mapa_de_respaldo(columnas, filas, origen_x)
 
@@ -161,9 +160,14 @@ class VistaPersecucion(Vista):
         self.jugador.objetivo = mapa.centro_celda(*celda)
 
     def manejar_evento(self, evento):
+        if evento.type == KEYDOWN and evento.key == K_TAB:
+            self.mapa.mostrar_rejilla = not self.mapa.mostrar_rejilla
+            return
+
         if evento.type == KEYDOWN and evento.key == K_F5:
+            mostrar_rejilla = self.mapa.mostrar_rejilla
             self.mapa = self.cargar_mapa()
-            self.mapa.mostrar_rejilla = False
+            self.mapa.mostrar_rejilla = mostrar_rejilla
             self.area_juego = self.mapa.area()
             self.jugador = self._crear_jugador()
             self.enemigos = self._crear_enemigos()
@@ -201,8 +205,8 @@ class VistaPersecucion(Vista):
         algoritmo = self.selector.etiqueta
         dibujar_banda_hud(
             self.pantalla, ALTO_HUD, "PERSECUCION",
-            ["[CLIC IZQ] RUTA DEL JUGADOR   ·   LOS ENEMIGOS PERSIGUEN AL VERTE   ·   [F5] RECARGAR   ·   [ESC] VOLVER AL MENU",
-             f"IA ENEMIGA: {algoritmo}   ·   ELIGELA ABAJO"],
+            ["[CLIC IZQ] RUTA DEL JUGADOR   ·   LOS ENEMIGOS PERSIGUEN AL VERTE   ·   [TAB] REJILLA   ·   [F5] RECARGAR",
+             f"IA ENEMIGA: {algoritmo}   ·   ELIGELA ABAJO   ·   [ESC] VOLVER AL MENU"],
         )
 
         self.pantalla.blit(

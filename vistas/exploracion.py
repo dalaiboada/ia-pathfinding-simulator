@@ -129,7 +129,9 @@ class VistaExploracion(Vista):
 
     def recargar_mapa(self):
         """Vuelve a leer el JSON del disco y recoloca al jugador en un sitio libre."""
+        mostrar_rejilla = self.mapa.mostrar_rejilla
         self.mapa = self.cargar_mapa()
+        self.mapa.mostrar_rejilla = mostrar_rejilla
         self.area_juego = self.mapa.area()
         self.jugador.mapa = self.mapa
         self.jugador.area_movimiento = self.area_juego
@@ -159,6 +161,10 @@ class VistaExploracion(Vista):
         self.jugador.cambiar_estado("reposo")
 
     def manejar_evento(self, evento):
+        if evento.type == KEYDOWN and evento.key == K_TAB:
+            self.mapa.mostrar_rejilla = not self.mapa.mostrar_rejilla
+            return
+
         if evento.type == KEYDOWN and evento.key == K_F5:
             self.recargar_mapa()
             return
@@ -187,8 +193,8 @@ class VistaExploracion(Vista):
         algoritmo = NOMBRES_ALGORITMO.get(self.juego.algoritmo_busqueda, "A*")
         dibujar_banda_hud(
             self.pantalla, ALTO_HUD, "EXPLORACION",
-            [f"[CLIC IZQ] RUTA {algoritmo} HACIA EL CURSOR   ·   [WASD] MOVIMIENTO ALTERNATIVO   ·   [J] DISPARAR",
-             "[K] GOLPEAR   ·   [C] AGACHARSE   ·   [F5] RECARGAR MAPA   ·   [ESC] VOLVER AL MENÚ"],
+            [f"[CLIC IZQ] RUTA {algoritmo} AL CURSOR   ·   [WASD] MOVER   ·   [J] DISPARAR   ·   [K] GOLPEAR   ·   [C] AGACHARSE",
+             "[TAB] REJILLA   ·   [F5] RECARGAR MAPA   ·   [ESC] VOLVER AL MENÚ"],
         )
 
         if self.jugador.objetivo is not None:

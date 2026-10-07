@@ -11,6 +11,7 @@ from config import (
     ANCHO_PANEL,
     ANCHO_VENTANA,
     RUTA_JUGADOR,
+    RUTA_MAPA_RUTAS,
     STEP_ANGULOS,
     TAM_CELDA,
     VELOCIDAD_ANIMACION_MAX,
@@ -52,7 +53,7 @@ class VistaControladorRutas(Vista):
     def __init__(self, juego):
         super().__init__(juego)
 
-        self.mapa = MapaRutas(ANCHO_MAPA, ALTO_VENTANA, ALTO_HUD, TAM_CELDA)
+        self.mapa = self.cargar_mapa()
         self.area_mapa = self.mapa.area()
         self.area_panel = Rect(ANCHO_MAPA, 0, ANCHO_PANEL, ALTO_VENTANA)
 
@@ -60,8 +61,7 @@ class VistaControladorRutas(Vista):
         self.paleta = self.preparar_paleta()
 
         # Punto de partida y meta de ejemplo, y el personaje que recorre la ruta.
-        self.mapa.colocar_inicio(self.mapa.filas // 2, 1)
-        self.mapa.colocar_meta(self.mapa.filas // 2, self.mapa.columnas - 2)
+        self.asegurar_inicio_meta()
         self.jugador = Jugador(
             RUTA_JUGADOR,
             *self.mapa.centro_celda(*self.mapa.inicio),
@@ -93,6 +93,44 @@ class VistaControladorRutas(Vista):
         return SelectorCyber(
             X_PANEL, Y_SELECTOR, ANCHO_TARJETA, ALTO_SELECTOR, opciones, seleccion=indice,
         )
+
+    # ------------------------------------------------------------------ mapa
+
+    def cargar_mapa(self):
+        """Lee `mapas/rutas.json`; si falta o esta roto, empieza en hierba."""
+        columnas = ANCHO_MAPA // TAM_CELDA
+        filas = (ALTO_VENTANA - ALTO_HUD) // TAM_CELDA
+        try:
+            return MapaRutas.cargar_json(
+                RUTA_MAPA_RUTAS,
+                columnas=columnas,
+                filas=filas,
+                tamano_celda=TAM_CELDA,
+                origen_x=0,
+                origen_y=ALTO_HUD,
+            )
+        except (OSError, ValueError) as error:
+            print(f"[rutas] no pude leer {RUTA_MAPA_RUTAS}: {error}")
+            print("[rutas] empiezo con una rejilla de hierba")
+            return MapaRutas(columnas, filas, TAM_CELDA, 0, ALTO_HUD)
+
+    def asegurar_inicio_meta(self):
+        if self.mapa.inicio is None:
+            self.mapa.colocar_inicio(self.mapa.filas // 2, 1)
+        if self.mapa.meta is None:
+            self.mapa.colocar_meta(self.mapa.filas // 2, self.mapa.columnas - 2)
+
+    def recargar_mapa(self):
+        """Vuelve a leer `mapas/rutas.json` sin perder la vista que se edita."""
+        mostrar_rejilla = self.mapa.mostrar_rejilla
+        self.mapa = self.cargar_mapa()
+        self.mapa.mostrar_rejilla = mostrar_rejilla
+        self.area_mapa = self.mapa.area()
+        self.asegurar_inicio_meta()
+        self.jugador.mapa = self.mapa
+        self.jugador.area_movimiento = self.area_mapa
+        self.jugador.rect.center = self.mapa.centro_celda(*self.mapa.inicio)
+        self.limpiar_busqueda()
 
     # ---------------------------------------------------------------- paleta
 
@@ -186,6 +224,10 @@ class VistaControladorRutas(Vista):
         self.jugador.cancelar_ruta()
 
     def manejar_evento(self, evento):
+        if evento.type == KEYDOWN and evento.key == K_F5:
+            self.recargar_mapa()
+            return
+
         if self.mapa.manejar_tecla(evento):
             # TAB, R y B cambian el mapa: la busqueda anterior ya no vale.
             self.limpiar_busqueda()
@@ -259,8 +301,8 @@ class VistaControladorRutas(Vista):
 
         dibujar_banda_hud(
             self.pantalla, ALTO_HUD, "CONTROLADOR DE RUTAS",
-            ["[CLIC IZQ] PINTAR   ·   [CLIC DER] BORRAR   ·   [B] AUTO-BORDE   ·   [1] INICIO   ·   [2] META   ·   [ESPACIO] EJECUTAR",
-             "[TAB] REJILLA   ·   [R] LIMPIAR MAPA   ·   [ESC] VOLVER AL MENÚ"],
+            ["[CLIC IZQ] PINTAR   ·   [CLIC DER] BORRAR   ·   [1] INICIO   ·   [2] META   ·   [ESPACIO] EJECUTAR",
+             "[TAB] REJILLA   ·   [R] LIMPIAR   ·   [B] AUTO-BORDE   ·   [F5] RECARGAR   ·   [ESC] VOLVER AL MENÚ"],
             ancho_hud=ANCHO_MAPA,
         )
 

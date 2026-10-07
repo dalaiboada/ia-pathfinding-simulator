@@ -67,12 +67,14 @@ RUTA_FONTE = os.path.join(RUTA_FUENTES, "game.ttf")
 # audio
 RUTA_AUDIO_PRESIONAR_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "presionar_boton.ogg")
 RUTA_AUDIO_HOVER_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "hover_boton.ogg")
-RUTA_AUDIO_PISADAS_HIERBA = os.path.join(RUTA_AUDIO, "pisadas_hierba.ogg")
-RUTA_AUDIO_PISADAS_PAVIMENTO = os.path.join(RUTA_AUDIO, "pisadas_pavimento.ogg")
+RUTA_AUDIO_PISADAS_HIERBA = os.path.join(RUTA_AUDIO, "juego", "pisadas_hierba.mp3")
+RUTA_AUDIO_PISADAS_PAVIMENTO = os.path.join(RUTA_AUDIO,"juego", "pisadas_pavimento.mp3")
 
 # MAPAS y texturas de terreno
 RUTA_CARPETA_TEXTURAS = os.path.join(RUTA_MAPAS, "texturas")
 RUTA_MAPA_EXPLORACION = os.path.join(RUTA_MAPAS, "exploracion.json")
+RUTA_MAPA_RUTAS = os.path.join(RUTA_MAPAS, "rutas.json")
+RUTA_MAPA_PERSECUCION = os.path.join(RUTA_MAPAS, "persecucion.json")
 RUTA_TILESET = os.path.join(RUTA_IMAGENES, "mapa", "tileset.jpg")
 
 # Capas del mapa (mismo orden en el que se apilan)
@@ -100,9 +102,12 @@ MARCA_CAMINO = 2
 ALGORITMO_INICIAL = "astar"        # el personaje arranca con A*
 ALGORITMO_ENEMIGO_INICIAL = "astar"
 
-# Persecucion
+# Persecucion (hoja ultron.png: 12x8 cuadros de 48 px, 4 direcciones x 3 cuadros)
 NUMERO_ENEMIGOS = 5
-LADO_ENEMIGO = 24                  # px del cuadrado representativo
-VELOCIDAD_ENEMIGO = 1.0            # px por fotograma
-CAMPO_VISION_ENEMIGO = 7           # radio de vision en celdas
+CUADRO_ENEMIGO = 48                # px de cada cuadro en la hoja
+ESCALA_ENEMIGO = 1.3               # escala visual del sprite (48 * 1.3 = 62 px)
+LADO_ENEMIGO = int(CUADRO_ENEMIGO * ESCALA_ENEMIGO)
+VELOCIDAD_ENEMIGO = 1.0            # factor; se escala por el tamano del sprite
+VELOCIDAD_ANIMACION_ENEMIGO = 0.15 # cuadros por fotograma
+CAMPO_VISION_ENEMIGO = 5          # radio de vision en celdas
 RECALCULO_RUTA_ENEMIGA = 10        # fotogramas entre recalculos de ruta
