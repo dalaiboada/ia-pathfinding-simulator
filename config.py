@@ -65,8 +65,9 @@ RUTA_RASTRO = os.path.join(RUTA_IMAGENES, "interfaz", "cursor_click.png")
 RUTA_FONTE = os.path.join(RUTA_FUENTES, "game.ttf")
 
 # audio
-RUTA_AUDIO_PRESIONAR_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "presionar_boton.ogg")
-RUTA_AUDIO_HOVER_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "hover_boton.ogg")
+RUTA_AUDIO_PRESIONAR_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "presionar_boton.mp3")
+RUTA_AUDIO_HOVER_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "hover_boton.mp3")
+
 RUTA_AUDIO_PISADAS_HIERBA = os.path.join(RUTA_AUDIO, "juego", "pisadas_hierba.mp3")
 RUTA_AUDIO_PISADAS_PAVIMENTO = os.path.join(RUTA_AUDIO,"juego", "pisadas_pavimento.mp3")
 
