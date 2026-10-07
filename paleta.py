@@ -36,5 +36,10 @@ COLOR_MARCA_VISITADA = (52, 152, 219)
 COLOR_INICIO = (0, 240, 255)
 COLOR_META = (255, 62, 154)
 
+# Enemigos y su campo de vision (persecucion)
+COLOR_ENEMIGO = (255, 70, 120)
+COLOR_ENEMIGO_BORDE = (255, 180, 210)
+COLOR_CAMPO_VISION = (255, 70, 120)
+
 # Lineas de la rejilla
 COLOR_LINEA = mezclar((255, 255, 255), COLOR_FONDO_MAPA, 45 / 255)

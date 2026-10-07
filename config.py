@@ -95,3 +95,14 @@ COSTO_REFERENCIA = 1.0
 MARCA_NINGUNA = 0
 MARCA_VISITADA = 1
 MARCA_CAMINO = 2
+
+# --- IA / busqueda de caminos
+ALGORITMO_INICIAL = "astar"        # el personaje arranca con A*
+ALGORITMO_ENEMIGO_INICIAL = "astar"
+
+# Persecucion
+NUMERO_ENEMIGOS = 5
+LADO_ENEMIGO = 24                  # px del cuadrado representativo
+VELOCIDAD_ENEMIGO = 1.0            # px por fotograma
+CAMPO_VISION_ENEMIGO = 7           # radio de vision en celdas
+RECALCULO_RUTA_ENEMIGA = 10        # fotogramas entre recalculos de ruta

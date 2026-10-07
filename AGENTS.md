@@ -89,7 +89,8 @@ formas.
 | `paleta.py` | Colores + `mezclar()` | Activo, sin pygame |
 | `arranque.py` | `iniciar()`, `fuente()`, `comprobar_iniciado()` | Activo |
 | `dibujo.py` | Velo, rejilla, tarjeta, HUD, texto centrado | Activo |
-| `motor.py` | `Juego`: bucle principal y navegación | Activo |
+| `busqueda.py` | BFS, DFS, Dijkstra, A\*, Greedy y `ResultadoBusqueda` | Activo, sin pygame |
+| `motor.py` | `Juego`: bucle principal, navegación y algoritmo activo | Activo |
 | `mapas/exploracion.json` | Mapa de la vista Exploración | Activo, se recarga con `F5` |
 
 ```
@@ -100,7 +101,8 @@ simulador/
 ├── paleta.py                      colores + mezclar()               (sin pygame)
 ├── arranque.py                    iniciar(), fuente(), comprobar_iniciado()
 ├── dibujo.py                      velo, rejilla, tarjeta, HUD, texto centrado
-├── motor.py                       Juego: bucle principal y navegación
+├── busqueda.py                    BFS, DFS, Dijkstra, A*, Greedy       (sin pygame)
+├── motor.py                       Juego: bucle principal, navegación y algoritmo
 ├── assets/
 │   ├── img/
 │   │   ├── juego/                 fondo.jpg, ironman.png, ultron.png
@@ -115,7 +117,8 @@ simulador/
 │   └── exploracion.json           14 x 32 celdas, 3 capas (esquema v2)
 ├── entidades/
 │   ├── proyectil.py               Proyectil
-│   └── jugador.py                 Jugador + obtener_sub_cuadros()
+│   ├── jugador.py                 Jugador + obtener_sub_cuadros()
+│   └── enemigo.py                 Enemigo (cuadrado perseguidor)
 ├── mundo/
 │   ├── terreno.py                 Terreno y subclases (física)        (sin pygame)
 │   ├── objetos.py                 ObjetoMapa y ObjetoCofre
@@ -125,7 +128,8 @@ simulador/
 ├── interfaz/
 │   ├── boton.py                   BotonTexto
 │   ├── cursor.py                  CustomMouse
-│   └── deslizador.py              DeslizadorCyber
+│   ├── deslizador.py              DeslizadorCyber
+│   └── selector.py                SelectorCyber
 └── vistas/
     ├── base.py                    Vista
     ├── menu.py                    VistaMenu
@@ -134,7 +138,7 @@ simulador/
     └── persecucion.py             VistaPersecucion
 ```
 
-Son 26 módulos `.py` con responsabilidad única.
+Son 29 módulos `.py` con responsabilidad única.
 
 ---
 
@@ -260,20 +264,23 @@ Nombres planos desde la raíz de `simulador/`:
 
 ```
 config, paleta          → nada
+busqueda                → nada                              (sin pygame)
 arranque                → config
 dibujo                  → arranque, config, paleta
 mundo.terreno           → config                          (sin pygame)
 mundo.objetos           → pygame
 mundo.catalogo          → config, pygame, mundo.terreno, mundo.objetos
-mundo.mapa_terreno      → config, paleta, pygame, mundo.catalogo
+mundo.mapa_terreno      → config, paleta, pygame, mundo.catalogo, busqueda
 mundo.mapa              → pygame, mundo.mapa_terreno
 entidades.proyectil     → paleta
 entidades.jugador       → config, entidades.proyectil
+entidades.enemigo       → busqueda, config, paleta
 interfaz.boton          → config, pygame
 interfaz.cursor         → pygame
 interfaz.deslizador     → paleta
+interfaz.selector       → arranque, paleta
 vistas.base             → nada
-vistas.*                → arranque, config, paleta, dibujo, y lo que necesitan
+vistas.*                → arranque, busqueda, config, paleta, dibujo, y lo que necesitan
 motor                   → arranque, config, vistas, interfaz.cursor
 IA.py                   → motor, arranque
 ```
@@ -481,6 +488,48 @@ pintar. Gestiona `TAB`, `R` y `B`; la pintura la hace la vista. `B` ejecuta
 `autotile_pavimento()`, que recalcula borde/esquina de cada celda de pavimento
 según sus vecinos (las matrices siguen guardando IDs explícitos).
 
+### Búsqueda de caminos
+
+`busqueda.py` es lógica pura (sin pygame) y no sabe de mapas ni de sprites: solo
+de una "rejilla" que exponga `filas`, `columnas`, `bloqueada(fila, col)` y
+`costo_en(fila, col)` (coste de **entrar** en la celda). El movimiento es cardinal
+(4 vecinos), igual que el del jugador.
+
+| Función | Optimiza | Notas |
+|---|---|---|
+| `buscar_bfs` | nº de pasos | Ignora el coste. |
+| `buscar_dfs` | — | Rápido, caminos largos y sinuosos. |
+| `buscar_dijkstra` | coste real | No se expone en la UI. |
+| `buscar_astar` | coste real | `coste` + heurística Manhattan (`COSTO_MINIMO` admisible). |
+| `buscar_greedy` | — | Solo heurística; rápido, no óptimo. |
+| `buscar(algoritmo, rejilla, inicio, meta)` | — | Despacha; `ValueError` si el nombre no existe. |
+
+`ALGORITMOS = ("astar", "bfs", "dfs", "greedy")` es lo que ofrece la UI;
+`NOMBRES_ALGORITMO` da las etiquetas. `buscar` devuelve un `ResultadoBusqueda` con
+`camino` (incluye inicio y meta), `visitados` (orden de expansión), `costo` y
+`algoritmo`.
+
+`MapaTerreno.buscar_camino(inicio, meta, algoritmo, rejilla=None)` ejecuta el
+algoritmo, pinta `MARCA_VISITADA` sobre los visitados y `MARCA_CAMINO` sobre el
+camino, y devuelve el resultado. `rejilla_para(tamano)` devuelve una
+`RejillaEntidad`: una celda se bloquea si el rect de la entidad (su tamaño en px)
+centrado en ella no cabe sin tocar suelo intransitable ni objeto sólido. El
+jugador mide 64 px (2×2 celdas), así que usa su propia rejilla; los enemigos, de
+24 px, usan el mapa tal cual.
+
+El **estado activo** vive en `Juego`: `algoritmo_busqueda` (personaje, por
+defecto `ALGORITMO_INICIAL = "astar"`, se elige en Rutas) y `algoritmo_enemigo`
+(enemigos, `ALGORITMO_ENEMIGO_INICIAL = "astar"`, se elige en Persecución).
+`Jugador.fijar_ruta(waypoints)` guarda los centros de celda a seguir y
+`avanzar_por_ruta()` los recorre un eje por fotograma; `cancelar_ruta()` la
+descarta.
+
+`entidades/enemigo.py` es un cuadrado (aún no se usa `ultron.png`). Ve al jugador
+si está a ≤ `CAMPO_VISION_ENEMIGO` celdas (Chebyshev) con línea de visión libre
+(Bresenham); a partir de ahí **queda alerta para siempre**. Con `"ninguno"`
+persigue en línea recta; con un algoritmo, recalcula ruta cada
+`RECALCULO_RUTA_ENEMIGA` fotogramas o si el jugador cambia de celda.
+
 ---
 
 ## 7. Las cuatro vistas
@@ -496,9 +545,12 @@ El patio de pruebas. El mapa sale de `mapas/exploracion.json` (14 filas × 32
 columnas; el JSON declara celdas de 40 px, pero la vista impone `TAM_CELDA = 32`)
 y se recarga con `F5`.
 
-El jugador nace en la celda `inicio` del JSON y se mueve con clic izquierdo hacia
-el cursor (con un marcador de ondas cian en el destino) o con WASD. Choca contra
-los obstáculos y los cofres, y va más despacio por la hierba que por el pavimento.
+El jugador nace en la celda `inicio` del JSON. Al hacer clic izquierdo se planifica
+una ruta con el algoritmo activo (`juego.algoritmo_busqueda`, A\* por defecto) hasta
+la celda del cursor, se pintan `MARCA_VISITADA`/`MARCA_CAMINO` y el jugador la sigue
+rodeando los obstáculos. Con WASD sigue habiendo movimiento cardinal libre, con un
+marcador de ondas cian en el destino del clic. Choca contra los obstáculos y los
+cofres, y va más despacio por la hierba que por el pavimento.
 
 Si el JSON falta o está roto, avisa por consola y dibuja un patio de respaldo
 generado por código.
@@ -506,34 +558,50 @@ generado por código.
 ### Controlador de rutas
 El reparto pedido en el enunciado: mapa **más ancho** que el panel.
 
-- **Mapa** (izquierda, 960 px): rejilla 30×17 = 510 celdas, toda en hierba.
-- **Panel** (derecha, 340 px): paleta de 3 terrenos + cofre, 6 tarjetas y el deslizador.
+- **Mapa** (izquierda, 960 px): rejilla 30×17 = 510 celdas, toda en hierba. En ella
+  nacen un jugador (en `inicio`) y un marcador de meta, y el jugador recorre la ruta.
+- **Panel** (derecha, 340 px): selector de algoritmo, paleta de 3 terrenos + cofre, 6
+  tarjetas y el deslizador.
 
 Reparto vertical del panel:
 
 | Banda | Y | Altura |
 |---|---|---|
-| Título y estado | 25 – 75 | — |
-| Paleta de 3 terrenos | 86 | 34 |
-| 6 tarjetas, paso 64 | 130 → 506 | 56 |
-| Divisor | 520 | — |
-| Etiqueta de velocidad | 538 | — |
-| Deslizador | 570 | 10 |
+| Título y estado | 18 – 68 | — |
+| Selector de algoritmo | 92 | 30 |
+| Paleta de 3 terrenos | 138 | 34 |
+| 6 tarjetas, paso 56 | 184 → 512 | 48 |
+| Divisor | 522 | — |
+| Etiqueta de velocidad | 536 | — |
+| Deslizador | 566 | 10 |
+
+Un `SelectorCyber` de 4 opciones (A\*, BFS, DFS, Greedy) elige el algoritmo del
+personaje; escribirlo en `juego.algoritmo_busqueda`. `ESPACIO` ejecuta la búsqueda
+de `inicio` a `meta`, anima al jugador a lo largo de la ruta y llena la telemetría:
+`Nodos Explorados` (tamaño de `visitados`) y `Costo Ruta` (coste real del camino,
+que lleva el nombre del algoritmo elegido). Cualquier edición del mapa (pintar,
+borrar, `TAB`, `R`, `B`, mover `1`/`2`) limpia marcas y telemetría.
 
 Las tarjetas de `Posición`, `Inicio` y `Meta` leen en vivo la celda bajo el ratón.
 `Terreno` muestra el tipo de la celda apuntada con su costo, o `BLOQUEA` si es
-intransitable. `Nodos Explorados` y `Costo Ruta` están fijas en `0` porque aún no hay
-búsqueda que las alimente — son los puntos de enganche del simulador.
+intransitable.
 
 La paleta incluye los tres terrenos y el cofre. Al pintar pavimento se guarda el
 ID base; `B` recalcula los bordes y esquinas de todo el pavimento. El clic derecho
 restaura el suelo por defecto y borra el objeto de la celda.
 
 ### Persecución
-Marcador de posición, tal como pedía el enunciado, pero ya dibuja un mapa real de
-3 capas (carga `mapas/exploracion.json`, se recarga con `F5`, con respaldo
-generado por código si falta). Es el destino natural del sistema de IA enemiga
-(`assets/img/juego/ultron.png` está reservado para ello).
+El jugador escapa por un mapa real de 3 capas (carga `mapas/exploracion.json`, se
+recarga con `F5`, con respaldo generado por código si falta) y 5 enemigos-cuadrado
+arrancan en fila por la parte superior. El clic izquierdo lanza al jugador con el
+algoritmo activo (`juego.algoritmo_busqueda`), con el mismo comportamiento que en
+Exploración.
+
+Un `SelectorCyber` de 5 opciones (Ninguno, A\*, BFS, DFS, Greedy) elige la IA
+enemiga (`juego.algoritmo_enemigo`). El círculo rosa translúcido de cada enemigo
+marca su campo de visión: cuando el jugador entra en él con línea de visión libre,
+el enemigo queda alerta para siempre y empieza a perseguir. `ultron.png` sigue
+reservado para darles sprite.
 
 ---
 
@@ -543,17 +611,21 @@ generado por código si falta). Es el destino natural del sistema de IA enemiga
 |---|---|---|
 | Menú | Clic en botón | Navega a la vista correspondiente (tras 400 ms) |
 | Todas | `ESC` | Vuelve al menú |
-| Exploración | Clic izquierdo | Fija destino; el jugador camina/corre hasta él |
-| Exploración | `WASD` / flechas | Movimiento alternativo cuando no hay destino |
+| Exploración | Clic izquierdo | Planifica una ruta con el algoritmo activo hasta el cursor |
+| Exploración | `WASD` / flechas | Movimiento cardinal libre (se ignora mientras hay ruta) |
 | Exploración | `SHIFT` | Correr |
 | Exploración | `J` / `K` / `C` | Disparar / golpear / agacharse |
 | Rutas | Clic izquierdo | Pinta el terreno/objeto elegido en la paleta |
 | Rutas | Clic derecho | Restaura el suelo y borra el objeto de la celda |
+| Rutas | Selector | Elige el algoritmo que usa el personaje |
+| Rutas | `ESPACIO` | Ejecuta la búsqueda `inicio` → `meta` y anima la ruta |
 | Rutas | `1` / `2` | Coloca inicio / meta en la celda bajo el ratón |
 | Rutas | `TAB` | Muestra u oculta la rejilla |
 | Rutas | `B` | Recalcula bordes y esquinas del pavimento |
 | Rutas | `R` | Limpia el mapa |
 | Rutas | Deslizador | Ritmo del jugador y de sus animaciones (ver §9) |
+| Persecución | Clic izquierdo | Lanza al jugador por la ruta hasta el cursor |
+| Persecución | Selector | Elige la IA de los enemigos (incluye "Ninguno") |
 | Exploración / Persecución | `F5` | Recarga `mapas/exploracion.json` |
 
 ---
@@ -570,13 +642,12 @@ Apuntadas para que no se interpreten como errores de implementación:
 2. **No hay botón de salir en el menú.** Se cierra la ventana con la X. `QUIT` está
    manejado.
 3. **Los proyectiles solo se mueven en horizontal**, igual que en el original.
-4. **Sin búsqueda implementada**: no hay BFS, Dijkstra ni A*. El panel, la
-   rejilla, las marcas y los marcadores de inicio/meta ya están listos para
-   alimentarlos.
-5. **El jugador no es un buscador de caminos.** Con el ratón avanza en cardinal
-   hacia el destino y se detiene si no progresa; en un laberinto con obstáculos
-   rodeando el destino **no lo rodea**, abandona. El rodeo es justo lo que dará el
-   algoritmo de búsqueda, no el controlador de movimiento.
+4. **El enemigo sigue siendo un cuadrado.** `ultron.png` está reservado pero aún
+   no se recorta para darle sprite.
+5. **El movimiento clásico del ratón convive con las rutas.** El clic ya planifica
+   un camino (`buscar_camino` + `fijar_ruta`), pero `avanzar_hacia_objetivo()`
+   —el avance cardinal directo que abandona si no progresa— sigue en el código por
+   si alguna vista lo usa; ya no es lo que dispara el clic izquierdo.
 6. **El muro no tiene tile en el tileset** (id `100` usa un color plano de
    respaldo). Los pasillos de una sola celda de ancho usan el tile base de
    pavimento: el esquema de bordes del tileset no tiene una variante "recta".
@@ -605,6 +676,12 @@ reintroducen, conviene que sigan comprobando, como mínimo:
   `F5` recarga el JSON recolocando al jugador en un sitio libre.
 - El editor de Rutas: paleta de terrenos + objetos, pintado, restaurar, `TAB`, `R`,
   `B` (auto-borde), `1`/`2`, y que un clic en el panel no toque la rejilla.
+- La búsqueda: los cuatro algoritmos encuentran camino entre inicio y meta, BFS y
+  A\* respetan la interfaz de la rejilla, `buscar_camino` pinta visitados y camino,
+  y `rejilla_para(64)` bloquea lo que no cabe.
+- La persecución: los enemigos solo se mueven tras ver al jugador (campo de visión
+  + línea de visión), con `"ninguno"` en línea recta y con un algoritmo rodeando
+  obstáculos.
 - Las pisadas: `terreno_bajo()` devuelve el terreno correcto bajo los pies y el
   temporizador respeta `intervalo_pasos_ms`.
 - El deslizador: que el porcentaje escale el paso real, el ritmo de los cuadros y
@@ -637,5 +714,10 @@ reintroducen, conviene que sigan comprobando, como mínimo:
   el clic derecho los borra.
 - `terreno_bajo()` devuelve el terreno correcto bajo los pies del jugador; las
   pisadas suenan con su `intervalo_pasos_ms` cuando hay audio disponible.
+- La búsqueda funciona de punta a punta: A\* da coste 54 (todo hierba) con 252 nodos
+  explorados frente a los 364 de BFS en la rejilla de 30×17; el selector cambia
+  `juego.algoritmo_busqueda` y `ESPACIO` llena `Nodos Explorados`/`Costo Ruta`.
+- En Persecución hay 5 enemigos que se activan al entrar el jugador en su campo de
+  visión (en la prueba headless, 2 de 5 quedaron alertados).
 - `logica_de_mapa/` (demo de referencia) se eliminó una vez integrados su tileset
   y sus sonidos.

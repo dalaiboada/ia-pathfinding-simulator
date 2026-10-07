@@ -3,7 +3,14 @@
 from pygame import *
 
 import arranque
-from config import FPS, RUTA_CURSOR, RUTA_RASTRO, VELOCIDAD_ANIMACION_INICIAL
+from config import (
+    ALGORITMO_ENEMIGO_INICIAL,
+    ALGORITMO_INICIAL,
+    FPS,
+    RUTA_CURSOR,
+    RUTA_RASTRO,
+    VELOCIDAD_ANIMACION_INICIAL,
+)
 from interfaz.cursor import CustomMouse
 from vistas import VistaControladorRutas, VistaExploracion, VistaMenu, VistaPersecucion
 
@@ -16,6 +23,10 @@ class Juego:
         self.cursor = CustomMouse(RUTA_CURSOR, RUTA_RASTRO)
         
         self.velocidad_animacion = VELOCIDAD_ANIMACION_INICIAL
+        # Algoritmo que usa el personaje (se elige en Rutas) y el que usan los
+        # enemigos (se elige en Persecucion).
+        self.algoritmo_busqueda = ALGORITMO_INICIAL
+        self.algoritmo_enemigo = ALGORITMO_ENEMIGO_INICIAL
         self.eventos = []
 
         self.vistas = {

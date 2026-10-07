@@ -14,6 +14,7 @@ import os
 
 from pygame import *
 
+import busqueda
 from config import (
     MARCA_CAMINO,
     MARCA_NINGUNA,
@@ -454,6 +455,36 @@ class MapaTerreno:
             if self.marcas[fila][col] == marca
         ]
 
+    # -------------------------------------------------------------- busqueda
+
+    def rejilla_para(self, tamano):
+        """Rejilla de busqueda adaptada al tamano (en px) de una entidad.
+
+        Una celda se considera bloqueada si el rect de la entidad centrado en
+        ella no cabe sin tocar suelo intransitable ni objeto solido. Asi la ruta
+        que devuelve el algoritmo es pisable por ese sprite y no solo por una
+        celda abstracta.
+        """
+        return RejillaEntidad(self, tamano)
+
+    def buscar_camino(self, inicio, meta, algoritmo, rejilla=None):
+        """Ejecuta un algoritmo y pinta visitados y camino en la capa de marcas.
+
+        Devuelve el ResultadoBusqueda. Si `rejilla` es None se usa el mapa tal
+        cual (entidad de una celda); para sprites mayores pásale
+        `rejilla_para(tamano)`.
+        """
+        if rejilla is None:
+            rejilla = self
+        resultado = busqueda.buscar(algoritmo, rejilla, inicio, meta)
+
+        self.limpiar_marcas()
+        for fila, col in resultado.visitados:
+            self.marcar(fila, col, MARCA_VISITADA)
+        for fila, col in resultado.camino:
+            self.marcar(fila, col, MARCA_CAMINO)
+        return resultado
+
     # ---------------------------------------------------------------- render
 
     def _imagen_tile(self, id_tile):
@@ -568,6 +599,41 @@ class MapaTerreno:
         self.dibujar_marcas(superficie)
         self.dibujar_inicio_meta(superficie)
         self.dibujar_rejilla(superficie)
+
+
+class RejillaEntidad:
+    """Vista de un MapaTerreno para una entidad de cierto tamano en pixeles.
+
+    Cumple la interfaz que espera `busqueda`: filas, columnas, bloqueada y
+    costo_en. Cachea el resultado por celda, porque una misma consulta se repite
+    mucho dentro de una busqueda.
+    """
+
+    def __init__(self, mapa, tamano):
+        self.mapa = mapa
+        self.filas = mapa.filas
+        self.columnas = mapa.columnas
+        self.tamano = (int(tamano[0]), int(tamano[1]))
+        self._cache = {}
+
+    def _rect(self, fila, col):
+        rect = Rect(0, 0, self.tamano[0], self.tamano[1])
+        rect.center = self.mapa.centro_celda(fila, col)
+        return rect
+
+    def bloqueada(self, fila, col):
+        if not (0 <= fila < self.filas and 0 <= col < self.columnas):
+            return True
+        clave = (fila, col)
+        if clave not in self._cache:
+            self._cache[clave] = not self.mapa.superficie_libre(self._rect(fila, col))
+        return self._cache[clave]
+
+    def costo_en(self, fila, col):
+        return self.mapa.costo_en(fila, col)
+
+    def centro_celda(self, fila, col):
+        return self.mapa.centro_celda(fila, col)
 
 
 def _buscar_capa(datos, ruta, nombres, obligatoria):

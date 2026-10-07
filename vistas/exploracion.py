@@ -2,6 +2,7 @@
 
 from pygame import *
 
+from busqueda import NOMBRES_ALGORITMO
 from config import (
     ALTO_HUD,
     ALTO_VENTANA,
@@ -98,13 +99,41 @@ class VistaExploracion(Vista):
             return self.mapa.centro_celda(*self.mapa.inicio)
         return (self.mapa.area().centerx, self.mapa.area().centery)
 
+    def ir_hacia(self, posicion):
+        """Planifica con el algoritmo activo y lanza al jugador por la ruta."""
+        mapa = self.mapa
+        rejilla = mapa.rejilla_para(self.jugador.rect.size)
+
+        celda = mapa.celda_por_pos(posicion)
+        if celda is None:
+            return
+        if rejilla.bloqueada(*celda):
+            seguro = mapa.punto_libre_cerca(posicion, self.jugador.rect.size)
+            if seguro is None:
+                return
+            celda = mapa.celda_por_pos(seguro) or celda
+
+        origen = mapa.celda_por_pos(self.jugador.rect.center)
+        if origen is None:
+            return
+
+        resultado = mapa.buscar_camino(
+            origen, celda, self.juego.algoritmo_busqueda, rejilla,
+        )
+        if not resultado.camino:
+            self.jugador.cancelar_ruta()
+            return
+
+        self.jugador.fijar_ruta([mapa.centro_celda(*c) for c in resultado.camino[1:]])
+        self.jugador.objetivo = mapa.centro_celda(*celda)
+
     def recargar_mapa(self):
         """Vuelve a leer el JSON del disco y recoloca al jugador en un sitio libre."""
         self.mapa = self.cargar_mapa()
         self.area_juego = self.mapa.area()
         self.jugador.mapa = self.mapa
         self.jugador.area_movimiento = self.area_juego
-        self.jugador.objetivo = None
+        self.jugador.cancelar_ruta()
 
         destino = self.mapa.punto_libre_cerca(self.jugador.rect.center, self.jugador.rect.size)
         if destino is None:
@@ -126,7 +155,7 @@ class VistaExploracion(Vista):
         return velas
 
     def entrar(self):
-        self.jugador.objetivo = None
+        self.jugador.cancelar_ruta()
         self.jugador.cambiar_estado("reposo")
 
     def manejar_evento(self, evento):
@@ -135,7 +164,7 @@ class VistaExploracion(Vista):
             return
 
         if evento.type == MOUSEBUTTONDOWN and evento.button == 1:
-            self.jugador.fijar_objetivo(evento.pos)
+            self.ir_hacia(evento.pos)
 
         self.jugador.procesar_eventos([evento])
 
@@ -155,9 +184,10 @@ class VistaExploracion(Vista):
         self.mapa.dibujar_hover(self.pantalla)
         draw.rect(self.pantalla, COLOR_BORDE, self.area, 1)
 
+        algoritmo = NOMBRES_ALGORITMO.get(self.juego.algoritmo_busqueda, "A*")
         dibujar_banda_hud(
             self.pantalla, ALTO_HUD, "EXPLORACION",
-            ["[CLIC IZQ] CAMINAR HACIA EL CURSOR   ·   [WASD] MOVIMIENTO ALTERNATIVO   ·   [J] DISPARAR",
+            [f"[CLIC IZQ] RUTA {algoritmo} HACIA EL CURSOR   ·   [WASD] MOVIMIENTO ALTERNATIVO   ·   [J] DISPARAR",
              "[K] GOLPEAR   ·   [C] AGACHARSE   ·   [F5] RECARGAR MAPA   ·   [ESC] VOLVER AL MENÚ"],
         )
 

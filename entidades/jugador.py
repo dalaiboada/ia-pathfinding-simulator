@@ -117,6 +117,9 @@ class Jugador(sprite.Sprite):
         self.area_movimiento = area_movimiento
         self.proyectiles = grupo_proyectiles if grupo_proyectiles is not None else sprite.Group()
         self.objetivo = None
+        # Ruta planificada por un algoritmo de busqueda: lista de centros de
+        # celda en pixeles. Tiene prioridad sobre `objetivo` y sobre el teclado.
+        self.ruta = None
         self.mapa = mapa
         self.ultimo_avance = (centro_x, centro_y)
         self.fotogramas_sin_avance = 0
@@ -144,6 +147,28 @@ class Jugador(sprite.Sprite):
         self.ultimo_avance = self.rect.center
         self.fotogramas_sin_avance = 0
         return seguro
+
+    def fijar_ruta(self, waypoints):
+        """Guarda una ruta (centros de celda en pixeles) para seguirla.
+
+        El primer punto se ignora si coincide con el centro actual. Cancela la
+        persecucion de `objetivo`, porque la ruta manda.
+        """
+        self.ruta = list(waypoints) if waypoints else None
+        self.objetivo = None
+        self.ultimo_avance = self.rect.center
+        self.fotogramas_sin_avance = 0
+        return self.ruta
+
+    def cancelar_ruta(self):
+        self.ruta = None
+        self.objetivo = None
+
+    def _distancia_final_ruta(self):
+        if not self.ruta:
+            return 0
+        ultimo = self.ruta[-1]
+        return abs(ultimo[0] - self.rect.centerx) + abs(ultimo[1] - self.rect.centery)
 
     def aplicar_desplazamiento(self, desplazamiento_x, desplazamiento_y):
         """Mueve el sprite resolviendo obstaculos, si hay mapa."""
@@ -236,6 +261,12 @@ class Jugador(sprite.Sprite):
             self.actualizar_animacion()
             return
 
+        if self.ruta:
+            self.avanzar_por_ruta()
+            self.actualizar_animacion()
+            self.rect.clamp_ip(self.area_movimiento)
+            return
+
         if self.objetivo is not None:
             self.avanzar_hacia_objetivo()
             self.actualizar_animacion()
@@ -323,6 +354,63 @@ class Jugador(sprite.Sprite):
 
         if self.estado != "disparo":
             self.cambiar_estado(estado_destino)
+
+    def avanzar_por_ruta(self):
+        """Sigue los waypoints de una ruta planificada, un eje por fotograma."""
+        if not self.ruta:
+            self.ruta = None
+            return
+
+        # Descarta los waypoints ya alcanzados (el punto de partida se descarta
+        # solo, porque coincide con el centro actual).
+        while self.ruta:
+            destino = self.ruta[0]
+            if (abs(destino[0] - self.rect.centerx) <= self.UMBRAL_LLEGADA
+                    and abs(destino[1] - self.rect.centery) <= self.UMBRAL_LLEGADA):
+                self.ruta.pop(0)
+            else:
+                break
+
+        if not self.ruta:
+            self.ruta = None
+            self.objetivo = None
+            self.fotogramas_sin_avance = 0
+            if self.estado != "disparo":
+                self.cambiar_estado("reposo")
+            return
+
+        destino = self.ruta[0]
+        diferencia_x = destino[0] - self.rect.centerx
+        diferencia_y = destino[1] - self.rect.centery
+
+        # Un solo eje por fotograma; la ruta ya es cardinal.
+        if abs(diferencia_x) >= abs(diferencia_y):
+            paso_x, paso_y = diferencia_x, 0
+        else:
+            paso_x, paso_y = 0, diferencia_y
+
+        longitud = abs(paso_x) if paso_x else abs(paso_y)
+        if paso_x:
+            self.direccion = "derecha" if paso_x > 0 else "izquierda"
+
+        corriendo = self._distancia_final_ruta() > self.UMBRAL_CARRERA
+        factor = STEP_ANGULOS[1] if corriendo else STEP_ANGULOS[0]
+        paso = self.velocidad_sobre_terreno(factor * self.multiplicador)
+        if longitud < paso:
+            paso = longitud
+
+        self.aplicar_desplazamiento(paso_x / longitud * paso, paso_y / longitud * paso)
+
+        if not self._registrar_avance():
+            # El camino dejo de ser transitable o quedo bloqueado
+            self.ruta = None
+            self.objetivo = None
+            if self.estado != "disparo":
+                self.cambiar_estado("reposo")
+            return
+
+        if self.estado != "disparo":
+            self.cambiar_estado("correr" if corriendo else "caminar")
 
     def actualizar_animacion(self):
         cuadros_actuales = self.animaciones[self.estado][self.direccion]

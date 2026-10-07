@@ -3,12 +3,14 @@
 from pygame import *
 
 from arranque import fuente
+from busqueda import ALGORITMOS, NOMBRES_ALGORITMO
 from config import (
     ALTO_HUD,
     ALTO_VENTANA,
     ANCHO_MAPA,
     ANCHO_PANEL,
     ANCHO_VENTANA,
+    RUTA_JUGADOR,
     STEP_ANGULOS,
     TAM_CELDA,
     VELOCIDAD_ANIMACION_MAX,
@@ -17,6 +19,7 @@ from config import (
 from dibujo import dibujar_banda_hud, dibujar_tarjeta_cyber
 from entidades.jugador import Jugador
 from interfaz.deslizador import DeslizadorCyber
+from interfaz.selector import SelectorCyber
 from mundo.mapa import MapaRutas
 from paleta import (
     CIAN_BRILLANTE,
@@ -31,14 +34,16 @@ from .base import Vista
 # Reparto vertical del panel
 X_PANEL = ANCHO_MAPA + 25
 ANCHO_TARJETA = ANCHO_PANEL - 50
-Y_PALETA = 86
+Y_SELECTOR = 92
+ALTO_SELECTOR = 30
+Y_PALETA = 138
 ALTO_PALETA = 34
-Y_TARJETAS = 130
-PASO_TARJETA = 64
-ALTO_TARJETA = 56
-Y_DIVISOR = 520
-Y_ETIQUETA_VELOCIDAD = Y_DIVISOR + 18
-Y_DESLIZADOR = 570
+Y_TARJETAS = 184
+PASO_TARJETA = 56
+ALTO_TARJETA = 48
+Y_DIVISOR = 522
+Y_ETIQUETA_VELOCIDAD = Y_DIVISOR + 14
+Y_DESLIZADOR = 566
 
 
 class VistaControladorRutas(Vista):
@@ -54,6 +59,24 @@ class VistaControladorRutas(Vista):
         self.seleccion = self._seleccion_inicial()
         self.paleta = self.preparar_paleta()
 
+        # Punto de partida y meta de ejemplo, y el personaje que recorre la ruta.
+        self.mapa.colocar_inicio(self.mapa.filas // 2, 1)
+        self.mapa.colocar_meta(self.mapa.filas // 2, self.mapa.columnas - 2)
+        self.jugador = Jugador(
+            RUTA_JUGADOR,
+            *self.mapa.centro_celda(*self.mapa.inicio),
+            self.mapa.area(),
+            mapa=self.mapa,
+        )
+
+        self.selector = self._crear_selector(juego.algoritmo_busqueda)
+
+        # Telemetria del ultimo recorrido
+        self.nodos_explorados = 0
+        self.costo_ruta = 0.0
+        self.longitud_ruta = 0
+        self.algoritmo_ejecutado = "-"
+
         self.deslizador_velocidad = DeslizadorCyber(
             x=ANCHO_MAPA + 30,
             y=Y_DESLIZADOR,
@@ -61,6 +84,14 @@ class VistaControladorRutas(Vista):
             valor_min=VELOCIDAD_ANIMACION_MIN,
             valor_max=VELOCIDAD_ANIMACION_MAX,
             valor_inicial=juego.velocidad_animacion,
+        )
+
+    def _crear_selector(self, algoritmo_actual):
+        opciones = [(clave, NOMBRES_ALGORITMO.get(clave, clave)) for clave in ALGORITMOS]
+        claves = [clave for clave, _ in opciones]
+        indice = claves.index(algoritmo_actual) if algoritmo_actual in claves else 0
+        return SelectorCyber(
+            X_PANEL, Y_SELECTOR, ANCHO_TARJETA, ALTO_SELECTOR, opciones, seleccion=indice,
         )
 
     # ---------------------------------------------------------------- paleta
@@ -113,10 +144,55 @@ class VistaControladorRutas(Vista):
         else:
             self.mapa.colocar_objeto(fila, col, valor)
 
+    # -------------------------------------------------------------- busqueda
+
+    def ejecutar_busqueda(self):
+        """Busca desde inicio hasta meta con el algoritmo elegido y anima la ruta."""
+        inicio = self.mapa.inicio
+        meta = self.mapa.meta
+        if inicio is None or meta is None:
+            return
+
+        rejilla = self.mapa.rejilla_para(self.jugador.rect.size)
+        resultado = self.mapa.buscar_camino(
+            inicio, meta, self.juego.algoritmo_busqueda, rejilla,
+        )
+
+        self.nodos_explorados = len(resultado.visitados)
+        self.costo_ruta = resultado.costo
+        self.longitud_ruta = len(resultado.camino)
+        self.algoritmo_ejecutado = NOMBRES_ALGORITMO.get(self.juego.algoritmo_busqueda, "-")
+
+        self.jugador.rect.center = self.mapa.centro_celda(*inicio)
+        if resultado.camino:
+            self.jugador.fijar_ruta(
+                [self.mapa.centro_celda(*celda) for celda in resultado.camino[1:]]
+            )
+        else:
+            self.jugador.cancelar_ruta()
+
+    def limpiar_busqueda(self):
+        """Descarta marcas, ruta y telemetria tras editar el mapa."""
+        self.mapa.limpiar_marcas()
+        self.jugador.cancelar_ruta()
+        self.nodos_explorados = 0
+        self.costo_ruta = 0.0
+        self.longitud_ruta = 0
+        self.algoritmo_ejecutado = "-"
+
     # ----------------------------------------------------------------- ciclo
+
+    def entrar(self):
+        self.jugador.cancelar_ruta()
 
     def manejar_evento(self, evento):
         if self.mapa.manejar_tecla(evento):
+            # TAB, R y B cambian el mapa: la busqueda anterior ya no vale.
+            self.limpiar_busqueda()
+            return
+
+        if evento.type == KEYDOWN and evento.key == K_SPACE:
+            self.ejecutar_busqueda()
             return
 
         if evento.type == KEYDOWN:
@@ -127,14 +203,19 @@ class VistaControladorRutas(Vista):
                 self.mapa.hover = celda
             if celda is not None:
                 fila, col = celda
-                if evento.key == K_1:
-                    self.mapa.colocar_inicio(fila, col)
+                if evento.key == K_1 and self.mapa.colocar_inicio(fila, col):
+                    self.jugador.rect.center = self.mapa.centro_celda(fila, col)
+                    self.limpiar_busqueda()
                     return
-                if evento.key == K_2:
-                    self.mapa.colocar_meta(fila, col)
+                if evento.key == K_2 and self.mapa.colocar_meta(fila, col):
+                    self.limpiar_busqueda()
                     return
 
         if evento.type != MOUSEBUTTONDOWN:
+            return
+
+        if self.selector.manejar_evento(evento):
+            self.juego.algoritmo_busqueda = self.selector.clave
             return
 
         entrada = self.paleta_en_pos(evento.pos)
@@ -157,15 +238,19 @@ class VistaControladorRutas(Vista):
             return
 
         self.mapa.preparar_capa()
+        self.limpiar_busqueda()
 
     def actualizar(self):
         self.mapa.hover = self.mapa.celda_por_pos(mouse.get_pos())
+        self.selector.actualizar()
         self.deslizador_velocidad.actualizar(self.juego.eventos)
         if self.deslizador_velocidad.valor != self.juego.velocidad_animacion:
             self.juego.velocidad_animacion = self.deslizador_velocidad.valor
             # Se aplica ya, sin esperar a entrar en exploracion, para que el
             # efecto se vea al ir y volver entre vistas.
             Jugador.fijar_multiplicador(self.juego.velocidad_animacion)
+
+        self.jugador.update()
 
     # ---------------------------------------------------------------- dibujo
 
@@ -174,14 +259,15 @@ class VistaControladorRutas(Vista):
 
         dibujar_banda_hud(
             self.pantalla, ALTO_HUD, "CONTROLADOR DE RUTAS",
-            ["[CLIC IZQ] PINTAR SUELO/OBJETO   ·   [CLIC DER] BORRAR   ·   [B] AUTO-BORDE   ·   [1] INICIO   ·   [2] META",
-             "[TAB] MOSTRAR REJILLA   ·   [R] LIMPIAR MAPA   ·   [ESC] VOLVER AL MENÚ"],
+            ["[CLIC IZQ] PINTAR   ·   [CLIC DER] BORRAR   ·   [B] AUTO-BORDE   ·   [1] INICIO   ·   [2] META   ·   [ESPACIO] EJECUTAR",
+             "[TAB] REJILLA   ·   [R] LIMPIAR MAPA   ·   [ESC] VOLVER AL MENÚ"],
             ancho_hud=ANCHO_MAPA,
         )
 
         self.pantalla.fill(COLOR_FONDO, self.area_mapa)
         self.mapa.dibujar(self.pantalla)
         self.mapa.dibujar_hover(self.pantalla)
+        self.jugador.dibujar(self.pantalla)
         draw.rect(self.pantalla, COLOR_BORDE, self.area_mapa, 1)
 
         self.dibujar_panel()
@@ -193,12 +279,15 @@ class VistaControladorRutas(Vista):
         draw.line(panel, CIAN_BRILLANTE, (ANCHO_MAPA, 0), (ANCHO_MAPA, ALTO_VENTANA), 2)
         draw.line(panel, CIAN_OSCURO, (ANCHO_MAPA - 2, 0), (ANCHO_MAPA - 2, ALTO_VENTANA), 1)
 
-        panel.blit(fuente("cyber_titulo").render("MÉTRICAS", True, CIAN_BRILLANTE), (X_PANEL, 25))
+        panel.blit(fuente("cyber_titulo").render("MÉTRICAS", True, CIAN_BRILLANTE), (X_PANEL, 18))
         panel.blit(
             fuente("cyber_diminuta").render("ESTADO: SIMULADOR EN LÍNEA", True, TEXTO_SECUNDARIO),
-            (X_PANEL, 52),
+            (X_PANEL, 44),
         )
-        draw.line(panel, CIAN_OSCURO, (X_PANEL, 75), (ANCHO_VENTANA - 25, 75), 1)
+        draw.line(panel, CIAN_OSCURO, (X_PANEL, 68), (ANCHO_VENTANA - 25, 68), 1)
+
+        self.selector.dibujar_etiqueta(panel, "ALGORITMO DEL PERSONAJE")
+        self.selector.dibujar(panel)
 
         self.dibujar_paleta()
         self.dibujar_tarjetas()
@@ -252,8 +341,8 @@ class VistaControladorRutas(Vista):
             ("Inicio", f"({inicio[0]}, {inicio[1]})" if inicio else "(-, -)", ""),
             ("Meta", f"({meta[0]}, {meta[1]})" if meta else "(-, -)", ""),
             ("Terreno", valor_terreno, unidad_terreno),
-            ("Nodos Explorados", "0", "NODOS"),
-            ("Costo Ruta", "0.00", "PTS"),
+            ("Nodos Explorados", str(self.nodos_explorados), "NODOS"),
+            (f"Costo Ruta {self.algoritmo_ejecutado}", f"{self.costo_ruta:.2f}", "PTS"),
         ]
 
         for indice, (titulo, valor, unidad) in enumerate(tarjetas):

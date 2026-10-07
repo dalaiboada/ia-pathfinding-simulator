@@ -1,19 +1,38 @@
-"""Persecución: escenario con las 3 capas, pendiente del sistema de IA enemiga."""
+"""Persecución: el jugador escapa y 5 enemigos lo persiguen al verlo."""
 
 from pygame import *
 
 from arranque import fuente
+from busqueda import ALGORITMOS, NOMBRES_ALGORITMO
 from config import (
     ALTO_HUD,
     ALTO_VENTANA,
     ANCHO_VENTANA,
+    CAMPO_VISION_ENEMIGO,
+    LADO_ENEMIGO,
+    NUMERO_ENEMIGOS,
+    RUTA_JUGADOR,
     RUTA_MAPA_EXPLORACION,
     TAM_CELDA,
 )
-from dibujo import dibujar_banda_hud, dibujar_texto_centrado
+from dibujo import dibujar_banda_hud
+from entidades.enemigo import Enemigo
+from entidades.jugador import Jugador
+from interfaz.selector import SelectorCyber
 from mundo.mapa_terreno import MapaTerreno
-from paleta import COLOR_BORDE, COLOR_FONDO, TEXTO_BLANCO, TEXTO_SECUNDARIO
+from paleta import (
+    CIAN_BRILLANTE,
+    COLOR_BORDE,
+    COLOR_CAMPO_VISION,
+    COLOR_FONDO,
+)
 from .base import Vista
+
+# Selector de IA enemiga, pegado a la parte baja del mapa
+X_SELECTOR = 190
+ANCHO_SELECTOR = 560
+ALTO_SELECTOR = 34
+Y_SELECTOR = ALTO_VENTANA - ALTO_SELECTOR - 12
 
 
 class VistaPersecucion(Vista):
@@ -25,6 +44,12 @@ class VistaPersecucion(Vista):
         self.mapa = self.cargar_mapa()
         self.mapa.mostrar_rejilla = False
         self.area_juego = self.mapa.area()
+
+        self.selector = self._crear_selector(juego.algoritmo_enemigo)
+        self._campo_vision = self._crear_campo_vision()
+
+        self.jugador = self._crear_jugador()
+        self.enemigos = self._crear_enemigos()
 
     # ------------------------------------------------------------------ mapa
 
@@ -55,36 +80,133 @@ class VistaPersecucion(Vista):
             id_objeto = ids_objeto[0]
             for fila, col in ((filas // 2, columnas // 3), (filas // 3, 2 * columnas // 3)):
                 mapa.colocar_objeto(fila, col, id_objeto)
+        mapa.colocar_inicio(filas - 2, columnas // 2)
         mapa.preparar_capa()
         return mapa
 
+    # ------------------------------------------------------------- entidades
+
+    def _crear_jugador(self):
+        if self.mapa.inicio is not None:
+            centro = self.mapa.centro_celda(*self.mapa.inicio)
+        else:
+            centro = self.mapa.area().center
+        return Jugador(
+            RUTA_JUGADOR,
+            *centro,
+            self.area_juego,
+            mapa=self.mapa,
+        )
+
+    def _crear_enemigos(self):
+        enemigos = sprite.Group()
+        columnas = self.mapa.columnas
+        for indice in range(NUMERO_ENEMIGOS):
+            col = int((indice + 1) * columnas / (NUMERO_ENEMIGOS + 1))
+            col = max(1, min(columnas - 2, col))
+            centro = self.mapa.centro_celda(1, col)
+            seguro = self.mapa.punto_libre_cerca(centro, (LADO_ENEMIGO, LADO_ENEMIGO))
+            if seguro is None:
+                continue
+            enemigos.add(Enemigo(seguro, self.mapa, self.mapa))
+        return enemigos
+
+    def _crear_selector(self, algoritmo_actual):
+        opciones = [("ninguno", "NINGUNO")]
+        opciones += [(clave, NOMBRES_ALGORITMO.get(clave, clave)) for clave in ALGORITMOS]
+        claves = [clave for clave, _ in opciones]
+        indice = claves.index(algoritmo_actual) if algoritmo_actual in claves else 0
+        return SelectorCyber(
+            X_SELECTOR, Y_SELECTOR, ANCHO_SELECTOR, ALTO_SELECTOR, opciones, seleccion=indice,
+        )
+
+    def _crear_campo_vision(self):
+        radio = CAMPO_VISION_ENEMIGO * TAM_CELDA
+        superficie = Surface((radio * 2, radio * 2), SRCALPHA)
+        draw.circle(superficie, COLOR_CAMPO_VISION + (26,), (radio, radio), radio)
+        draw.circle(superficie, COLOR_CAMPO_VISION + (60,), (radio, radio), radio, 1)
+        return superficie
+
     # ----------------------------------------------------------------- ciclo
+
+    def entrar(self):
+        self.jugador = self._crear_jugador()
+        self.enemigos = self._crear_enemigos()
+
+    def ir_hacia(self, posicion):
+        mapa = self.mapa
+        rejilla = mapa.rejilla_para(self.jugador.rect.size)
+
+        celda = mapa.celda_por_pos(posicion)
+        if celda is None:
+            return
+        if rejilla.bloqueada(*celda):
+            seguro = mapa.punto_libre_cerca(posicion, self.jugador.rect.size)
+            if seguro is None:
+                return
+            celda = mapa.celda_por_pos(seguro) or celda
+
+        origen = mapa.celda_por_pos(self.jugador.rect.center)
+        if origen is None:
+            return
+
+        resultado = mapa.buscar_camino(
+            origen, celda, self.juego.algoritmo_busqueda, rejilla,
+        )
+        if not resultado.camino:
+            self.jugador.cancelar_ruta()
+            return
+
+        self.jugador.fijar_ruta([mapa.centro_celda(*c) for c in resultado.camino[1:]])
+        self.jugador.objetivo = mapa.centro_celda(*celda)
 
     def manejar_evento(self, evento):
         if evento.type == KEYDOWN and evento.key == K_F5:
             self.mapa = self.cargar_mapa()
             self.mapa.mostrar_rejilla = False
             self.area_juego = self.mapa.area()
+            self.jugador = self._crear_jugador()
+            self.enemigos = self._crear_enemigos()
+            return
+
+        if self.selector.manejar_evento(evento):
+            self.juego.algoritmo_enemigo = self.selector.clave
+            return
+
+        if evento.type == MOUSEBUTTONDOWN and evento.button == 1:
+            self.ir_hacia(evento.pos)
 
     def actualizar(self):
         self.mapa.hover = self.mapa.celda_por_pos(mouse.get_pos())
+        self.selector.actualizar()
+        self.jugador.update()
+        self.enemigos.update(self.jugador, self.juego.algoritmo_enemigo)
+
+    # ---------------------------------------------------------------- dibujo
 
     def dibujar(self):
         self.pantalla.fill(COLOR_FONDO)
         self.mapa.dibujar(self.pantalla)
         self.mapa.dibujar_hover(self.pantalla)
+
+        for enemigo in self.enemigos:
+            self.pantalla.blit(self._campo_vision, self._campo_vision.get_rect(center=enemigo.rect.center))
+
+        for enemigo in self.enemigos:
+            enemigo.dibujar(self.pantalla)
+        self.jugador.dibujar(self.pantalla)
+
         draw.rect(self.pantalla, COLOR_BORDE, self.area, 1)
 
+        algoritmo = self.selector.etiqueta
         dibujar_banda_hud(
             self.pantalla, ALTO_HUD, "PERSECUCION",
-            ["MAPA DE 3 CAPAS LISTO (SUELO / OBJETOS / ENTIDADES)   ·   [F5] RECARGAR   ·   [ESC] VOLVER AL MENU"],
+            ["[CLIC IZQ] RUTA DEL JUGADOR   ·   LOS ENEMIGOS PERSIGUEN AL VERTE   ·   [F5] RECARGAR   ·   [ESC] VOLVER AL MENU",
+             f"IA ENEMIGA: {algoritmo}   ·   ELIGELA ABAJO"],
         )
 
-        dibujar_texto_centrado(
-            self.pantalla, "MODULO DE PERSECUCION DE ENEMIGOS",
-            fuente("hud"), TEXTO_BLANCO, (ANCHO_VENTANA // 2, self.area.centery - 20),
+        self.pantalla.blit(
+            fuente("cyber_etiqueta").render("IA ENEMIGA", True, CIAN_BRILLANTE),
+            (20, Y_SELECTOR + 9),
         )
-        dibujar_texto_centrado(
-            self.pantalla, "Aqui ira el calculo de la ruta enemiga (A* / BFS) y su persecucion.",
-            fuente("instrucciones"), TEXTO_SECUNDARIO, (ANCHO_VENTANA // 2, self.area.centery + 20),
-        )
+        self.selector.dibujar(self.pantalla)
