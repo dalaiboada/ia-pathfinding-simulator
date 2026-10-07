@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "nombre": "Patio de pruebas",
+  "tamano_celda": 40,
+  "terrenos": [
+    {
+      "codigo": "p",
+      "nombre": "Pavimento",
+      "transitable": true,
+      "costo": 1.0,
+      "color": [148, 150, 158],
+      "textura": null
+    },
+    {
+      "codigo": "t",
+      "nombre": "Tierra",
+      "transitable": true,
+      "costo": 2.0,
+      "color": [122, 92, 63],
+      "textura": null
+    },
+    {
+      "codigo": "#",
+      "nombre": "Obstáculo",
+      "transitable": false,
+      "costo": null,
+      "color": [58, 34, 44],
+      "textura": null
+    }
+  ],
+  "capas": [
+    {
+      "nombre": "terreno",
+      "datos": [
+        "################################",
+        "#ttttttttttttttpptttttttttttttt#",
+        "#ttt#####ttttttppttttt######ttt#",
+        "#ttt#####ttttttppttttt######ttt#",
+        "#ttttttttttttttpptttttttttttttt#",
+        "#ppppppppppppptpptttttttttttttt#",
+        "#pppppppppppppppppppppppppppppp#",
+        "#pppppppppppppppppppppppppppppp#",
+        "#ttttttttttttttpptttttttttttttt#",
+        "#tt#####tttttttpptttttt######tt#",
+        "#tt#####tttttttpptttttt######tt#",
+        "#tttttttttt###tpptttttttttttttt#",
+        "#ttttttttttttttpptttttttttttttt#",
+        "################################"
+      ]
+    }
+  ],
+  "inicio": {
+    "fila": 4,
+    "col": 15
+  },
+  "meta": {
+    "fila": 9,
+    "col": 29
+  }
+}
