@@ -70,21 +70,22 @@ formas.
 | `assets/img/juego/fondo.jpg` | Fondo del menú (1920×1080, escalado a 1300×670) |
 | `assets/img/juego/ironman.png` | Hoja del jugador, 576×384 = rejilla 9×6 de celdas 64×64 |
 | `assets/img/juego/ultron.png` | Hoja del enemigo (reservada para Persecución) |
+| `assets/img/mapa/tileset.jpg` | Hoja de tiles 512×384 = 16×12 celdas de 32 px (suelo) |
 | `assets/img/interfaz/cursor.png` | Cursor personalizado (32×32) |
 | `assets/img/interfaz/cursor_click.png` | Rastro del cursor (32×32) |
 | `assets/fuentes/game.ttf` | Tipografía pixelada: títulos, botones, HUD |
 | `assets/audio/interfaz/presionar_boton.ogg` | Sonido de clic en botón |
 | `assets/audio/interfaz/hover_boton.ogg` | Sonido al pasar por encima de un botón |
-| `assets/audio/pisadas_pavimento.ogg` | Pisadas sobre pavimento (previsto, sin usar) |
-| `assets/audio/pisadas_tierra.ogg` | Pisadas sobre tierra (previsto, sin usar) |
-| `mapas/exploracion.json` | Mapa de terreno de la vista Exploración |
+| `assets/audio/pisadas_pavimento.ogg` | Pisadas sobre pavimento (usado por `TerrenoPavimento`) |
+| `assets/audio/pisadas_hierba.ogg` | Pisadas sobre hierba (usado por `TerrenoHierba`) |
+| `mapas/exploracion.json` | Mapa de 3 capas de la vista Exploración (esquema v2) |
 
 ### Código
 
 | Archivo | Rol | Estado |
 |---|---|---|
 | `IA.py` | **El juego.** `main()`, punto de entrada. | Activo |
-| `config.py` | Medidas, rutas de assets, marcas, costo de referencia | Activo, sin pygame |
+| `config.py` | Medidas, rutas de assets (tileset/audios), marcas, costo de referencia | Activo, sin pygame |
 | `paleta.py` | Colores + `mezclar()` | Activo, sin pygame |
 | `arranque.py` | `iniciar()`, `fuente()`, `comprobar_iniciado()` | Activo |
 | `dibujo.py` | Velo, rejilla, tarjeta, HUD, texto centrado | Activo |
@@ -103,20 +104,23 @@ simulador/
 ├── assets/
 │   ├── img/
 │   │   ├── juego/                 fondo.jpg, ironman.png, ultron.png
+│   │   ├── mapa/                  tileset.jpg (512x384, tiles de 32 px)
 │   │   └── interfaz/              cursor.png, cursor_click.png
 │   ├── fuentes/                   game.ttf
 │   └── audio/
 │       ├── interfaz/              presionar_boton.ogg, hover_boton.ogg
 │       ├── pisadas_pavimento.ogg
-│       └── pisadas_tierra.ogg
+│       └── pisadas_hierba.ogg
 ├── mapas/
-│   └── exploracion.json           14 x 32 celdas de 40 px
+│   └── exploracion.json           14 x 32 celdas, 3 capas (esquema v2)
 ├── entidades/
 │   ├── proyectil.py               Proyectil
 │   └── jugador.py                 Jugador + obtener_sub_cuadros()
 ├── mundo/
-│   ├── terreno.py                 TipoTerreno y catálogo             (sin pygame)
-│   ├── mapa_terreno.py            MapaTerreno: rejilla, JSON, colisión, render
+│   ├── terreno.py                 Terreno y subclases (física)        (sin pygame)
+│   ├── objetos.py                 ObjetoMapa y ObjetoCofre
+│   ├── catalogo.py                Catalogo: tileset, audios, IDs
+│   ├── mapa_terreno.py            MapaTerreno: capas suelo/objetos, colisión, render
 │   └── mapa.py                    MapaRutas, la rejilla editable de Rutas
 ├── interfaz/
 │   ├── boton.py                   BotonTexto
@@ -130,7 +134,7 @@ simulador/
     └── persecucion.py             VistaPersecucion
 ```
 
-Son 24 módulos `.py` con responsabilidad única.
+Son 26 módulos `.py` con responsabilidad única.
 
 ---
 
@@ -240,7 +244,7 @@ Orden de secciones, de arriba abajo:
 
 | Función | Qué hace |
 |---|---|
-| `iniciar()` | `init()`, `font.init()`, `set_mode()`, `set_caption()`, reloj y fuentes. Idempotente. |
+| `iniciar()` | `init()`, `mixer.init()` (tolerante a fallos), `font.init()`, `set_mode()`, `set_caption()`, reloj y fuentes. Idempotente. |
 | `fuente(clave)` | Devuelve una fuente por clave; el `KeyError` lista las claves válidas. |
 | `comprobar_iniciado()` | Lanza `RuntimeError` con mensaje claro si se usa el juego antes de `iniciar()`. |
 
@@ -258,8 +262,10 @@ Nombres planos desde la raíz de `simulador/`:
 config, paleta          → nada
 arranque                → config
 dibujo                  → arranque, config, paleta
-mundo.terreno           → nada
-mundo.mapa_terreno      → config, paleta, pygame, mundo.terreno
+mundo.terreno           → config                          (sin pygame)
+mundo.objetos           → pygame
+mundo.catalogo          → config, pygame, mundo.terreno, mundo.objetos
+mundo.mapa_terreno      → config, paleta, pygame, mundo.catalogo
 mundo.mapa              → pygame, mundo.mapa_terreno
 entidades.proyectil     → paleta
 entidades.jugador       → config, entidades.proyectil
@@ -330,50 +336,67 @@ comportamiento original; por encima satura, y por debajo hay un suelo
 Exploración lo aplica cada fotograma, así que el valor sobrevive al salto entre
 vistas.
 
+**Pisadas:** cada fotograma, `_actualizar_pasos()` mira el avance real del rect.
+Si se movió al menos un píxel, consulta `mapa.terreno_bajo()` en los pies
+(`rect.bottom - 2`), y reproduce su `sonido` cuando pasa su `intervalo_pasos_ms`
+(500 ms en hierba, 350 en pavimento). Al detenerse, el temporizador se reinicia.
+Si el audio no está disponible (`Terreno.sonido is None`), no pasa nada.
+
 ### Terreno
 
-`mundo/terreno.py` define los tipos de celda. Módulo de datos puros, sin pygame,
-como `config.py`:
+`mundo/terreno.py` define los tipos de celda **orientados a objetos**. Módulo de
+datos puros, sin pygame, como `config.py`. Cada tipo encapsula su física:
 
-| Clave | Nombre | Transitable | Costo |
-|---|---|---|---|
-| `p` | Pavimento | sí | `1.0` |
-| `t` | Tierra | sí | `2.0` |
-| `#` | Obstáculo | no | `null` |
+| Clase | Clave | Nombre | Transitable | Costo | `factor_vel` | Pisadas |
+|---|---|---|---|---|---|---|
+| `TerrenoHierba` | `hierba` | Hierba | sí | `2.0` | `0.5` | 500 ms, `pisadas_hierba.ogg` |
+| `TerrenoPavimento` | `pavimento` | Pavimento | sí | `1.0` | `1.0` | 350 ms, `pisadas_pavimento.ogg` |
+| `TerrenoMuro` | `muro` | Muro | no | `null` | `null` | — |
 
 `costo` es `None` **exactamente** cuando el terreno es intransitable, y siempre
 positivo cuando es transitable. Cargar un catálogo que rompa ese invariante es un
 error, no algo que se normalice en silencio.
 
-El costo modula la velocidad del jugador:
+La velocidad **se deriva del costo** (no hay una segunda fuente de verdad):
 
 ```
-velocidad = max(VELOCIDAD_MINIMA, base * (COSTO_REFERENCIA / costo))
+factor_vel = COSTO_REFERENCIA / costo
+velocidad  = max(VELOCIDAD_MINIMA, base * factor_vel)
 ```
 
 Con `COSTO_REFERENCIA = 1.0` y `VELOCIDAD_MINIMA = 1.0`: pavimento no penaliza,
-tierra divide la velocidad por dos, y ningún terreno puede inmovilizar al jugador.
+la hierba divide la velocidad por dos, y ningún terreno puede inmovilizar al
+jugador. El `intervalo_pasos_ms` y el sonido sí se declaran por clase, porque no
+se pueden deducir del costo.
 
-Cada tipo admite un campo `textura` opcional. Se resuelve **relativa al JSON que la
-declara**, se carga una sola vez, se escala a `TAM_CELDA` y se cachea por clave.
-Ahora todos los terrenos van por color plano; las texturas están soportadas pero no
-hay ninguna imagen en el repo.
+El catálogo se arma con `cargar_catalogo()` a partir del bloque `terrenos` del
+JSON (la clave elige la clase y los campos sobreescriben sus valores por defecto).
+Sin bloque, `catalogo_por_defecto()` devuelve los tres tipos.
 
 ### MapaTerreno
 
-Rejilla de celdas. Guarda el terreno y las superposiciones de la búsqueda **en dos
-matrices aparte**, para que el camino pueda discurrir por pavimento o por tierra
-sin que ambas cosas se pisen:
+Rejilla de celdas organizada en **tres capas**, como en el ejemplo de referencia
+(ya eliminado del repo):
 
-| Capa | Contenido |
-|---|---|
-| `celdas` | Clave de terreno, una por celda. |
-| `marcas` | `MARCA_NINGUNA` / `MARCA_VISITADA` / `MARCA_CAMINO`. |
+| Capa | Matriz | Contenido |
+|---|---|---|
+| Suelo | `suelo` | ID de tile del tileset (base, bordes y esquinas de pavimento). |
+| Objetos | `objetos` | ID de objeto estático (cofres) o `OBJETO_NINGUNO`. |
+| Entidades | — | Los sprites dinámicos, que dibuja la vista por encima. |
+| Búsqueda | `marcas` | `MARCA_NINGUNA` / `MARCA_VISITADA` / `MARCA_CAMINO`. |
 
 `inicio` y `meta` son **coordenadas**, no estados de celda. Se dibujan como anillos
-con cruz (`COLOR_INICIO` cian, `COLOR_META` magenta) por encima del terreno y bajo
-la rejilla. Son únicos: al mover uno, su celda anterior recupera el terreno por
+con cruz (`COLOR_INICIO` cian, `COLOR_META` magenta) por encima de objetos y bajo
+la rejilla. Son únicos: al mover uno, su celda anterior recupera el suelo por
 defecto (`_liberar_celda_anterior`).
+
+`preparar_capa()` pre-renderiza `capa_suelo` y `capa_objetos`. El orden de apilado
+es suelo → objetos → marcas → inicio/meta → rejilla → entidades.
+
+**Colisión:** una celda está `bloqueada` si su suelo es intransitable **o** si
+contiene un objeto sólido (`objeto.es_solido`). `superficie_libre`, `desplazar` y
+`punto_libre_cerca` usan esa definición, así que el jugador choca tanto con muros
+como con cofres.
 
 **Enganche de la búsqueda:** `marca_en`, `marcar`, `limpiar_marcas` y
 `celdas_marcadas` existen y funcionan, pero **nadie los llama todavía**. Un
@@ -384,7 +407,7 @@ Métodos de colisión que usa el jugador:
 
 | Método | Qué hace |
 |---|---|
-| `superficie_libre(rect)` | El rect cabe entero y no toca ningún obstáculo. |
+| `superficie_libre(rect)` | El rect cabe entero y no toca suelo ni objeto sólido. |
 | `desplazar(rect, dx, dy)` | Devuelve lo que se admite, resolviendo eje a eje. |
 | `punto_libre_cerca(centro, tamaño)` | Busca a anillos crecientes un sitio válido. |
 
@@ -392,34 +415,57 @@ Métodos de colisión que usa el jugador:
 movimiento entero y, si choca, prueba X e Y por separado para que el jugador
 deslice por el eje despejado.
 
+### Catálogo y objetos
+
+`mundo/catalogo.py` es el gestor central (equivalente a la clase `Catalogo` del
+ejemplo). Carga **una sola vez** el tileset (`assets/img/mapa/tileset.jpg`) y los
+audios, y traduce los IDs de las matrices:
+
+- `tile(id)` → superficie recortada del tileset (con el giro ya aplicado);
+- `terreno(id)` → instancia de `Terreno`, para la física;
+- `objeto(id)` → instancia de `ObjetoMapa`.
+
+`Catalogo.por_defecto()` reproduce el mapeo del ejemplo (hierba `0`, pavimento
+base `1`, bordes `2–5`, esquinas `6–9`, muro `100`, cofre `101`).
+`Catalogo.desde_json()` lo construye desde el bloque `tiles` del mapa.
+
+`mundo/objetos.py` define `ObjetoMapa` (base: `es_solido`, `imagen`,
+`interactuar()`) y `ObjetoCofre` (sólido e interactivo). La imagen se toma del
+tileset si el JSON declara `tile: [col, fila]`; si no, hay un dibujo procedural.
+
 ### Formato del JSON
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "nombre": "Patio de pruebas",
-  "tamano_celda": 40,
-  "terrenos": [ { "codigo": "p", "nombre": "Pavimento",
-                  "transitable": true, "costo": 1.0,
-                  "color": [148, 150, 158], "textura": null } ],
-  "capas": [ { "nombre": "terreno", "datos": ["####", "#pp#", "####"] } ],
+  "tamano_celda": 32,
+  "tileset": "../assets/img/mapa/tileset.jpg",
+  "terrenos": [ { "clave": "hierba", "costo": 2.0, "intervalo_pasos_ms": 500 } ],
+  "tiles":    [ { "id": 0, "terreno": "hierba", "col": 0, "fila": 0 },
+                { "id": 3, "terreno": "pavimento", "col": 6, "fila": 4, "giro": 180 } ],
+  "objetos":  [ { "id": 101, "tipo": "cofre", "solido": true } ],
+  "capas":    [ { "nombre": "suelo",   "datos": [[0, 1, 1, 0], [0, 0, 100, 0]] },
+                { "nombre": "objetos", "datos": [[0, 0, 0, 0], [0, 101, 0, 0]] } ],
   "inicio": { "fila": 0, "col": 0 },
-  "meta":   { "fila": 3, "col": 3 }
+  "meta":   { "fila": 1, "col": 3 }
 }
 ```
 
 Decisiones que conviene no cambiar sin pensarlo:
 
+- Las matrices usan **IDs numéricos explícitos** (como en el ejemplo). El loader
+  acepta además filas de texto (`p`/`t`/`#`) por compatibilidad.
 - Las filas de `datos` deben medir **lo mismo** entre sí.
-- La capa se busca por nombre entre `NOMBRE_CAPAS_POR_DEFECTO`
-  (`terreno`, `terrenos`, `suelo`), para poder añadir capas de objetos después.
-- `inicio` es **obligatorio**: sin él el juego no sabe dónde aparece el jugador.
-  `meta` es opcional.
-- Un mapa **más grande que la vista es un error, no un recorte**. Recortar en
-  silencio daría una forma distinta de la que la vista espera, así que
-  `cargar_json` se niega y lo dice. Un mapa más pequeño sí cabe: las celdas que
-  sobran se rellenan con el terreno por defecto.
-- Los caracteres que no están en el catálogo son un error, con fila y columna.
+- La capa de suelo se busca entre `NOMBRE_CAPAS_SUELO` (`suelo`, `terreno`,
+  `terrenos`); la de objetos entre `NOMBRE_CAPAS_OBJETOS` (`objetos`, ...) y es
+  opcional.
+- `inicio` es **obligatorio** y debe caer en una celda no bloqueada. `meta` es
+  opcional.
+- Un mapa **más grande que la vista es un error, no un recorte**. Un mapa más
+  pequeño sí cabe: las celdas que sobran se rellenan con el suelo por defecto.
+- IDs de suelo fuera de la lista `tiles`, o de objeto fuera de `objetos`, son un
+  error con fila y columna.
 
 Si el JSON no se puede leer, `VistaExploracion` **avisa por consola y dibuja un
 patio generado por código** (perímetro bloqueado y avenida en cruz), para que el
@@ -427,11 +473,13 @@ juego siga siendo jugable. `F5` sobrevive a los dos casos.
 
 ### MapaRutas
 
-`MapaRutas` hereda de `MapaTerreno` y solo añade la política de edición de su
-vista. Rejilla 30×17 = 510 celdas de 32 px, en el área `(0, 110, 960, 544)`.
+`MapaRutas` hereda de `MapaTerreno` y añade la política de edición de su vista.
+Rejilla 30×17 = 510 celdas de 32 px, en el área `(0, 110, 960, 544)`.
 
-No carga JSON. Empieza con el catálogo por defecto y todo en tierra, lista para
-pintar. Solo gestiona `TAB` y `R`; la pintura la hace la vista.
+No carga JSON. Empieza con `Catalogo.por_defecto()` y todo en hierba, lista para
+pintar. Gestiona `TAB`, `R` y `B`; la pintura la hace la vista. `B` ejecuta
+`autotile_pavimento()`, que recalcula borde/esquina de cada celda de pavimento
+según sus vecinos (las matrices siguen guardando IDs explícitos).
 
 ---
 
@@ -450,7 +498,7 @@ y se recarga con `F5`.
 
 El jugador nace en la celda `inicio` del JSON y se mueve con clic izquierdo hacia
 el cursor (con un marcador de ondas cian en el destino) o con WASD. Choca contra
-los obstáculos y va más despacio por la tierra que por el pavimento.
+los obstáculos y los cofres, y va más despacio por la hierba que por el pavimento.
 
 Si el JSON falta o está roto, avisa por consola y dibuja un patio de respaldo
 generado por código.
@@ -458,8 +506,8 @@ generado por código.
 ### Controlador de rutas
 El reparto pedido en el enunciado: mapa **más ancho** que el panel.
 
-- **Mapa** (izquierda, 960 px): rejilla 30×17 = 510 celdas, toda en tierra.
-- **Panel** (derecha, 340 px): paleta de terrenos, 6 tarjetas y el deslizador.
+- **Mapa** (izquierda, 960 px): rejilla 30×17 = 510 celdas, toda en hierba.
+- **Panel** (derecha, 340 px): paleta de 3 terrenos + cofre, 6 tarjetas y el deslizador.
 
 Reparto vertical del panel:
 
@@ -477,9 +525,15 @@ Las tarjetas de `Posición`, `Inicio` y `Meta` leen en vivo la celda bajo el rat
 intransitable. `Nodos Explorados` y `Costo Ruta` están fijas en `0` porque aún no hay
 búsqueda que las alimente — son los puntos de enganche del simulador.
 
+La paleta incluye los tres terrenos y el cofre. Al pintar pavimento se guarda el
+ID base; `B` recalcula los bordes y esquinas de todo el pavimento. El clic derecho
+restaura el suelo por defecto y borra el objeto de la celda.
+
 ### Persecución
-Marcador de posición, tal como pedía el enunciado. Es el destino natural del
-sistema de IA enemiga (`assets/img/juego/ultron.png` está reservado para ello).
+Marcador de posición, tal como pedía el enunciado, pero ya dibuja un mapa real de
+3 capas (carga `mapas/exploracion.json`, se recarga con `F5`, con respaldo
+generado por código si falta). Es el destino natural del sistema de IA enemiga
+(`assets/img/juego/ultron.png` está reservado para ello).
 
 ---
 
@@ -493,12 +547,14 @@ sistema de IA enemiga (`assets/img/juego/ultron.png` está reservado para ello).
 | Exploración | `WASD` / flechas | Movimiento alternativo cuando no hay destino |
 | Exploración | `SHIFT` | Correr |
 | Exploración | `J` / `K` / `C` | Disparar / golpear / agacharse |
-| Rutas | Clic izquierdo | Pone el terreno elegido en la paleta |
-| Rutas | Clic derecho | Restaura la celda al terreno por defecto |
+| Rutas | Clic izquierdo | Pinta el terreno/objeto elegido en la paleta |
+| Rutas | Clic derecho | Restaura el suelo y borra el objeto de la celda |
 | Rutas | `1` / `2` | Coloca inicio / meta en la celda bajo el ratón |
 | Rutas | `TAB` | Muestra u oculta la rejilla |
+| Rutas | `B` | Recalcula bordes y esquinas del pavimento |
 | Rutas | `R` | Limpia el mapa |
 | Rutas | Deslizador | Ritmo del jugador y de sus animaciones (ver §9) |
+| Exploración / Persecución | `F5` | Recarga `mapas/exploracion.json` |
 
 ---
 
@@ -521,8 +577,9 @@ Apuntadas para que no se interpreten como errores de implementación:
    hacia el destino y se detiene si no progresa; en un laberinto con obstáculos
    rodeando el destino **no lo rodea**, abandona. El rodeo es justo lo que dará el
    algoritmo de búsqueda, no el controlador de movimiento.
-6. **Los sonidos de pisadas** (`pisadas_pavimento.ogg`, `pisadas_tierra.ogg`) están
-   en `assets/audio/` pero todavía no hay código que los reproduzca.
+6. **El muro no tiene tile en el tileset** (id `100` usa un color plano de
+   respaldo). Los pasillos de una sola celda de ancho usan el tile base de
+   pavimento: el esquema de bordes del tileset no tiene una variante "recta".
 7. **No se pudo revisar la maquetación a ojo** durante el desarrollo, así que el
    aspecto final del menú, del panel y de los marcadores de inicio/meta merece una
    pasada visual manual.
@@ -537,17 +594,19 @@ reintroducen, conviene que sigan comprobando, como mínimo:
 
 - Que importar `simulador` **no abra ventana**, y que `config.py`, `paleta.py` y
   `terreno.py` carguen con `pygame` bloqueado.
-- El catálogo: los tres terrenos con su costo, y que rechace costo 0, un
-  intransitable con costo, códigos de más de un carácter, colores fuera de
-  `0..255`, claves repetidas y texturas inexistentes.
-- `mapas/exploracion.json`: 14 filas de 32, inicio y meta válidos, y que las celdas
-  transitables formen una sola región alcanzable.
-- Colisión, deslizamiento por el eje libre, movimiento cardinal y abandono de un
-  destino inalcanzable.
+- El catálogo: los tres terrenos con su costo y `factor_vel` derivado, ids de tile
+  dentro del recorte del tileset, y que rechace costo 0, un intransitable con
+  costo, tipos desconocidos y referencias a tiles u objetos inexistentes.
+- `mapas/exploracion.json`: 14 filas de 32, inicio y meta válidos, una sola región
+  transitable, y que la capa de objetos solo contenga ids declarados.
+- Colisión (suelo intransitable **y** objeto sólido), deslizamiento por el eje
+  libre, movimiento cardinal y abandono de un destino inalcanzable.
 - Que las cuatro vistas arrancan y dibujan, la navegación y el `ESC` funcionan, y
   `F5` recarga el JSON recolocando al jugador en un sitio libre.
-- El editor de Rutas: paleta, pintado, restaurar, `TAB`, `R`, `1`/`2`, y que un
-  clic en el panel no toque la rejilla.
+- El editor de Rutas: paleta de terrenos + objetos, pintado, restaurar, `TAB`, `R`,
+  `B` (auto-borde), `1`/`2`, y que un clic en el panel no toque la rejilla.
+- Las pisadas: `terreno_bajo()` devuelve el terreno correcto bajo los pies y el
+  temporizador respeta `intervalo_pasos_ms`.
 - El deslizador: que el porcentaje escale el paso real, el ritmo de los cuadros y
   la paciencia de la vigilancia de atasco, y que el valor sobreviva al salto entre
   vistas.
@@ -572,3 +631,11 @@ reintroducen, conviene que sigan comprobando, como mínimo:
 - El deslizador recorre 1→100 y propaga el valor; los rastros del cursor se
   desvanecen; los botones respetan el retardo de 400 ms.
 - El terreno frena al jugador donde toca y los obstáculos bloquean de verdad.
+- El mapa de 3 capas carga `exploracion.json` y dibuja suelo y objetos; el muro y
+  las variantes de pavimento se recortan del tileset (el muro, por color plano).
+- `B` recalcula bordes y esquinas del pavimento; los cofres bloquean la colisión y
+  el clic derecho los borra.
+- `terreno_bajo()` devuelve el terreno correcto bajo los pies del jugador; las
+  pisadas suenan con su `intervalo_pasos_ms` cuando hay audio disponible.
+- `logica_de_mapa/` (demo de referencia) se eliminó una vez integrados su tileset
+  y sus sonidos.

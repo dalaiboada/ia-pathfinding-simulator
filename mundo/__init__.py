@@ -1,13 +1,19 @@
-"""El mundo del simulador: el terreno y la rejilla de rutas."""
+"""El mundo del simulador: catalogo, terreno, objetos y rejillas."""
 
+from .catalogo import Catalogo
 from .mapa import MapaRutas
 from .mapa_terreno import MapaTerreno
-from .terreno import TipoTerreno, catalogo_por_defecto, cargar_catalogo
+from .objetos import ObjetoMapa, ObjetoCofre
+from .terreno import Terreno, TerrenoHierba, TerrenoMuro, TerrenoPavimento
 
 __all__ = [
+    "Catalogo",
     "MapaRutas",
     "MapaTerreno",
-    "TipoTerreno",
-    "catalogo_por_defecto",
-    "cargar_catalogo",
+    "ObjetoMapa",
+    "ObjetoCofre",
+    "Terreno",
+    "TerrenoHierba",
+    "TerrenoMuro",
+    "TerrenoPavimento",
 ]

@@ -128,6 +128,10 @@ class Jugador(sprite.Sprite):
         self.image = self.animaciones["reposo"][self.direccion][0]
         self.rect = self.image.get_rect(center=(centro_x, centro_y))
 
+        # Pisadas: se vigila el avance real por fotograma para saber si camina
+        self._centro_pasos = self.rect.center
+        self._ultimo_paso_ms = 0
+
     # ------------------------------------------------------- terreno y colision
 
     def fijar_objetivo(self, posicion):
@@ -158,6 +162,31 @@ class Jugador(sprite.Sprite):
         if costo is None:
             return velocidad_base
         return max(self.VELOCIDAD_MINIMA, velocidad_base * (COSTO_REFERENCIA / costo))
+
+    def _actualizar_pasos(self):
+        """Reproduce el sonido de pisadas del terreno que se pisa, con su intervalo."""
+        centro = self.rect.center
+        se_mueve = (
+            abs(centro[0] - self._centro_pasos[0]) >= 1
+            or abs(centro[1] - self._centro_pasos[1]) >= 1
+        )
+        self._centro_pasos = centro
+
+        if not se_mueve:
+            self._ultimo_paso_ms = 0
+            return
+        if self.mapa is None:
+            return
+
+        terreno = self.mapa.terreno_bajo((self.rect.centerx, self.rect.bottom - 2))
+        if terreno is None or terreno.sonido is None:
+            return
+
+        intervalo = terreno.intervalo_pasos_ms or 400
+        ahora = time.get_ticks()
+        if ahora - self._ultimo_paso_ms >= intervalo:
+            terreno.sonido.play()
+            self._ultimo_paso_ms = ahora
 
     def _registrar_avance(self):
         """Vigila que el jugador siga avanzando y no se quede empujando un muro."""
@@ -196,6 +225,7 @@ class Jugador(sprite.Sprite):
     def update(self):
         teclas = key.get_pressed()
         self.actualizar_paciencia()
+        self._actualizar_pasos()
 
         if self.estado == "golpe":
             self.actualizar_animacion()

@@ -51,7 +51,7 @@ class VistaControladorRutas(Vista):
         self.area_mapa = self.mapa.area()
         self.area_panel = Rect(ANCHO_MAPA, 0, ANCHO_PANEL, ALTO_VENTANA)
 
-        self.terreno_activo = self.mapa.clave_obstaculo() or self.mapa.terreno_defecto
+        self.seleccion = self._seleccion_inicial()
         self.paleta = self.preparar_paleta()
 
         self.deslizador_velocidad = DeslizadorCyber(
@@ -65,23 +65,53 @@ class VistaControladorRutas(Vista):
 
     # ---------------------------------------------------------------- paleta
 
+    def _seleccion_inicial(self):
+        clave = "hierba" if "hierba" in self.mapa.catalogo.terrenos else next(
+            iter(self.mapa.catalogo.terrenos)
+        )
+        return ("terreno", clave)
+
     def preparar_paleta(self):
-        """Un boton por tipo de terreno, para elegir con que se pinta."""
-        tipos = list(self.mapa.catalogo.values())
+        """Un boton por tipo de terreno y por objeto, para elegir con que se pinta."""
+        entradas = []
+
+        for terreno in self.mapa.catalogo.terrenos.values():
+            id_base = self.mapa.catalogo.id_base_de(terreno.clave)
+            entradas.append({
+                "clase": "terreno",
+                "clave": terreno.clave,
+                "nombre": terreno.nombre,
+                "imagen": self.mapa.catalogo.tile(id_base),
+                "color": terreno.color,
+            })
+
+        for id_objeto, objeto in self.mapa.catalogo.objetos.items():
+            entradas.append({
+                "clase": "objeto",
+                "clave": id_objeto,
+                "nombre": objeto.nombre,
+                "imagen": objeto.imagen,
+                "color": None,
+            })
+
         hueco = 6
-        ancho = (ANCHO_TARJETA - hueco * (len(tipos) - 1)) // len(tipos)
+        ancho = (ANCHO_TARJETA - hueco * (len(entradas) - 1)) // len(entradas)
+        for indice, entrada in enumerate(entradas):
+            entrada["rect"] = Rect(X_PANEL + indice * (ancho + hueco), Y_PALETA, ancho, ALTO_PALETA)
+        return entradas
 
-        paleta = []
-        for indice, tipo in enumerate(tipos):
-            celda = Rect(X_PANEL + indice * (ancho + hueco), Y_PALETA, ancho, ALTO_PALETA)
-            paleta.append((tipo, celda))
-        return paleta
-
-    def terreno_de_la_paleta(self, posicion):
-        for tipo, celda in self.paleta:
-            if celda.collidepoint(posicion):
-                return tipo
+    def paleta_en_pos(self, posicion):
+        for entrada in self.paleta:
+            if entrada["rect"].collidepoint(posicion):
+                return entrada
         return None
+
+    def aplicar_seleccion(self, fila, col):
+        clase, valor = self.seleccion
+        if clase == "terreno":
+            self.mapa.colocar_terreno_clave(fila, col, valor)
+        else:
+            self.mapa.colocar_objeto(fila, col, valor)
 
     # ----------------------------------------------------------------- ciclo
 
@@ -107,9 +137,9 @@ class VistaControladorRutas(Vista):
         if evento.type != MOUSEBUTTONDOWN:
             return
 
-        tipo = self.terreno_de_la_paleta(evento.pos)
-        if tipo is not None:
-            self.terreno_activo = tipo.clave
+        entrada = self.paleta_en_pos(evento.pos)
+        if entrada is not None:
+            self.seleccion = (entrada["clase"], entrada["clave"])
             return
 
         celda = self.mapa.celda_por_pos(evento.pos)
@@ -118,9 +148,11 @@ class VistaControladorRutas(Vista):
 
         fila, col = celda
         if evento.button == 1:
-            self.mapa.colocar_terreno(fila, col, self.terreno_activo)
+            self.aplicar_seleccion(fila, col)
         elif evento.button == 3:
-            self.mapa.limpiar_celda(fila, col)
+            # Primero retira el objeto; si no hay, restaura el suelo.
+            if not self.mapa.quitar_objeto(fila, col):
+                self.mapa.limpiar_celda(fila, col)
         else:
             return
 
@@ -142,7 +174,7 @@ class VistaControladorRutas(Vista):
 
         dibujar_banda_hud(
             self.pantalla, ALTO_HUD, "CONTROLADOR DE RUTAS",
-            ["[CLIC IZQ] PINTAR TERRENO   ·   [CLIC DER] RESTAURAR   ·   [1] INICIO   ·   [2] META",
+            ["[CLIC IZQ] PINTAR SUELO/OBJETO   ·   [CLIC DER] BORRAR   ·   [B] AUTO-BORDE   ·   [1] INICIO   ·   [2] META",
              "[TAB] MOSTRAR REJILLA   ·   [R] LIMPIAR MAPA   ·   [ESC] VOLVER AL MENÚ"],
             ancho_hud=ANCHO_MAPA,
         )
@@ -175,11 +207,16 @@ class VistaControladorRutas(Vista):
     def dibujar_paleta(self):
         panel = self.pantalla
 
-        for tipo, celda in self.paleta:
-            seleccionada = tipo.clave == self.terreno_activo
+        for entrada in self.paleta:
+            celda = entrada["rect"]
+            seleccionada = (entrada["clase"], entrada["clave"]) == self.seleccion
             muestra = Rect(celda.x + 3, celda.y + 3, celda.width - 6, celda.height - 16)
 
-            draw.rect(panel, tipo.color, muestra)
+            if entrada["imagen"] is not None:
+                panel.blit(transform.scale(entrada["imagen"], muestra.size), muestra.topleft)
+            else:
+                draw.rect(panel, entrada["color"] or COLOR_FONDO, muestra)
+
             draw.rect(
                 panel,
                 CIAN_BRILLANTE if seleccionada else CIAN_OSCURO,
@@ -187,7 +224,7 @@ class VistaControladorRutas(Vista):
                 2 if seleccionada else 1,
             )
 
-            etiqueta = fuente("cyber_diminuta").render(tipo.nombre, True, TEXTO_SECUNDARIO)
+            etiqueta = fuente("cyber_diminuta").render(entrada["nombre"], True, TEXTO_SECUNDARIO)
             panel.blit(etiqueta, etiqueta.get_rect(center=(celda.centerx, celda.bottom - 7)))
 
     def dibujar_tarjetas(self):
@@ -195,6 +232,7 @@ class VistaControladorRutas(Vista):
 
         hover = self.mapa.hover
         terreno = self.mapa.terreno_en(*hover) if hover else None
+        objeto = self.mapa.objeto_en(*hover) if hover else None
 
         if terreno is None:
             valor_terreno, unidad_terreno = "-", ""
@@ -202,6 +240,9 @@ class VistaControladorRutas(Vista):
             valor_terreno, unidad_terreno = terreno.nombre, f"COSTO {terreno.costo:g}"
         else:
             valor_terreno, unidad_terreno = terreno.nombre, "BLOQUEA"
+
+        if objeto is not None:
+            unidad_terreno = f"OBJETO: {objeto.nombre.upper()}"
 
         inicio = self.mapa.inicio
         meta = self.mapa.meta

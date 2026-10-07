@@ -72,22 +72,22 @@ class VistaExploracion(Vista):
     def mapa_de_respaldo(self, columnas, filas, origen_x):
         """Patio minimo: perimetro bloqueado, avenida en cruz y nada mas."""
         mapa = MapaTerreno(columnas, filas, TAM_CELDA, origen_x, ALTO_HUD)
-        clave_muro = mapa.clave_obstaculo() or mapa.terreno_defecto
+        clave_muro = mapa.clave_obstaculo() or mapa.terreno_mas_barato().clave
         clave_rapida = mapa.terreno_mas_barato().clave
 
         for col in range(columnas):
-            mapa.colocar_terreno(0, col, clave_muro)
-            mapa.colocar_terreno(filas - 1, col, clave_muro)
+            mapa.colocar_terreno_clave(0, col, clave_muro)
+            mapa.colocar_terreno_clave(filas - 1, col, clave_muro)
         for fila in range(1, filas - 1):
-            mapa.colocar_terreno(fila, 0, clave_muro)
-            mapa.colocar_terreno(fila, columnas - 1, clave_muro)
+            mapa.colocar_terreno_clave(fila, 0, clave_muro)
+            mapa.colocar_terreno_clave(fila, columnas - 1, clave_muro)
 
         avenida_fila = filas // 2
         for col in range(1, columnas - 1):
-            mapa.colocar_terreno(avenida_fila, col, clave_rapida)
+            mapa.colocar_terreno_clave(avenida_fila, col, clave_rapida)
         avenida_col = columnas // 2
         for fila in range(1, filas - 1):
-            mapa.colocar_terreno(fila, avenida_col, clave_rapida)
+            mapa.colocar_terreno_clave(fila, avenida_col, clave_rapida)
 
         mapa.colocar_inicio(filas // 2, avenida_col)
         mapa.preparar_capa()

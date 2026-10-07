@@ -1,8 +1,12 @@
-"""Rejilla de terreno: carga desde JSON, dibujo y resolucion de movimiento.
+"""Rejilla de mapa: capas de suelo y objetos, colision y dibujo.
 
-El terreno se guarda como clave de texto por celda, y las superposiciones de la
-busqueda en una matriz aparte. Asi el camino solucionado puede discurrir por
-pavimento o por tierra sin que ambas cosas se pisen.
+El mapa se organiza en tres capas, igual que en el ejemplo de logica_de_mapa:
+  - `suelo`: matriz de IDs de tile (base, bordes y esquinas del tileset).
+  - `objetos`: matriz de IDs de objeto estatico (cofres) o OBJETO_NINGUNO.
+  - `entidades`: los sprites dinamicos, que dibuja cada vista por encima.
+
+Las superposiciones de la busqueda van en una cuarta matriz aparte (`marcas`),
+para que el camino solucionado no pise ni el suelo ni los objetos.
 """
 
 import json
@@ -14,6 +18,9 @@ from config import (
     MARCA_CAMINO,
     MARCA_NINGUNA,
     MARCA_VISITADA,
+    NOMBRE_CAPAS_OBJETOS,
+    NOMBRE_CAPAS_SUELO,
+    OBJETO_NINGUNO,
     TAM_CELDA,
 )
 from paleta import (
@@ -26,18 +33,19 @@ from paleta import (
     COLOR_MARCA_VISITADA,
     COLOR_META,
 )
-from .terreno import catalogo_por_defecto, cargar_catalogo
+from .catalogo import Catalogo
 
 # Alfa con el que se pinta cada superposicion sobre el terreno
 ALFA_MARCA_CAMINO = 205
 ALFA_MARCA_VISITADA = 115
 ALFA_REALCE = 55
 
-NOMBRE_CAPAS_POR_DEFECTO = ("terreno", "terrenos", "suelo")
+# Traduccion de un mapa de caracteres antiguo a claves de terreno
+CLAVE_POR_CARACTER = {"p": "pavimento", "t": "hierba", "#": "muro"}
 
 
 class MapaTerreno:
-    """Rejilla de celdas de terreno con consulta de costo y colision."""
+    """Rejilla con capas de suelo y objetos, consulta de costo y colision."""
 
     def __init__(
         self,
@@ -46,7 +54,7 @@ class MapaTerreno:
         tamano_celda=TAM_CELDA,
         origen_x=0,
         origen_y=0,
-        terreno_defecto="t",
+        catalogo=None,
     ):
         if columnas < 1 or filas < 1:
             raise ValueError("el mapa necesita al menos una celda")
@@ -60,10 +68,11 @@ class MapaTerreno:
         self.alto_util = filas * tamano_celda
 
         self.nombre = "mapa"
-        self.catalogo = catalogo_por_defecto()
-        self.terreno_defecto = terreno_defecto
+        self.catalogo = catalogo if catalogo is not None else Catalogo.por_defecto(tamano_celda)
+        self.tile_defecto = self.catalogo.id_defecto
 
-        self.celdas = [[terreno_defecto] * columnas for _ in range(filas)]
+        self.suelo = [[self.tile_defecto] * columnas for _ in range(filas)]
+        self.objetos = [[OBJETO_NINGUNO] * columnas for _ in range(filas)]
         self.marcas = [[MARCA_NINGUNA] * columnas for _ in range(filas)]
         self.inicio = None
         self.meta = None
@@ -73,7 +82,8 @@ class MapaTerreno:
 
         self._imagenes = {}
         self._imagenes_marca = {}
-        self.capa_terreno = Surface((self.ancho_util, self.alto_util))
+        self.capa_suelo = Surface((self.ancho_util, self.alto_util))
+        self.capa_objetos = Surface((self.ancho_util, self.alto_util), SRCALPHA)
         self.capa_rejilla = Surface((self.ancho_util, self.alto_util), SRCALPHA)
         self.preparar_capa()
 
@@ -108,10 +118,15 @@ class MapaTerreno:
 
     # ------------------------------------------------------- consultas terreno
 
+    def id_suelo(self, fila, col):
+        if not self._dentro(fila, col):
+            return None
+        return self.suelo[fila][col]
+
     def terreno_en(self, fila, col):
         if not self._dentro(fila, col):
             return None
-        return self.catalogo.get(self.celdas[fila][col])
+        return self.catalogo.terreno(self.suelo[fila][col])
 
     def terreno_bajo(self, posicion):
         celda = self.celda_por_pos(posicion)
@@ -122,6 +137,22 @@ class MapaTerreno:
     def transitable(self, fila, col):
         tipo = self.terreno_en(fila, col)
         return bool(tipo is not None and tipo.transitable)
+
+    def objeto_id_en(self, fila, col):
+        if not self._dentro(fila, col):
+            return OBJETO_NINGUNO
+        return self.objetos[fila][col]
+
+    def objeto_en(self, fila, col):
+        return self.catalogo.objeto(self.objeto_id_en(fila, col))
+
+    def objeto_solido_en(self, fila, col):
+        objeto = self.objeto_en(fila, col)
+        return bool(objeto is not None and objeto.es_solido)
+
+    def bloqueada(self, fila, col):
+        """True si la celda no se puede pisar: suelo intransitable u objeto solido."""
+        return not self.transitable(fila, col) or self.objeto_solido_en(fila, col)
 
     def costo_en(self, fila, col):
         """Costo de recorrer la celda; 0.0 si es obstaculo, para no proteger el None."""
@@ -139,30 +170,19 @@ class MapaTerreno:
 
     def terreno_mas_barato(self):
         """Tipo transitable de menor costo; el mas rapido para mover entidades."""
-        transitable = [t for t in self.catalogo.values() if t.transitable and t.costo]
+        transitable = [t for t in self.catalogo.terrenos.values() if t.transitable and t.costo]
         if not transitable:
             return None
         return min(transitable, key=lambda t: t.costo)
 
     def clave_obstaculo(self):
         """Clave del tipo intransitable, o None si el catalogo no tiene ninguno."""
-        for clave, tipo in self.catalogo.items():
-            if not tipo.transitable:
-                return clave
-        return None
-
-    def terreno_heredado(self, clave_por_defecto=None):
-        """Tipo que se restaura al borrar: el defecto, o el que indique la vista."""
-        if clave_por_defecto is not None and clave_por_defecto in self.catalogo:
-            return clave_por_defecto
-        if self.terreno_defecto in self.catalogo:
-            return self.terreno_defecto
-        return next(iter(self.catalogo))
+        return self.catalogo.clave_muro()
 
     # -------------------------------------------------------------- colisiones
 
     def superficie_libre(self, rect):
-        """True si el rect cabe entero en el mapa y no toca ningun obstaculo."""
+        """True si el rect cabe entero en el mapa y no toca suelo ni objeto solido."""
         if not self.area().colliderect(rect):
             return False
 
@@ -178,7 +198,7 @@ class MapaTerreno:
 
         for fila in range(fila_min, fila_max + 1):
             for col in range(col_min, col_max + 1):
-                if not self.transitable(fila, col):
+                if self.bloqueada(fila, col):
                     return False
         return True
 
@@ -260,39 +280,52 @@ class MapaTerreno:
         if not isinstance(datos, dict):
             raise ValueError(f"el mapa de {ruta} debe ser un objeto con claves, no {type(datos).__name__}")
 
-        carpeta = os.path.dirname(os.path.abspath(ruta))
-        catalogo = cargar_catalogo(datos.get("terrenos"), carpeta)
-        filas_datos = _buscar_capa_terreno(datos, ruta)
-
-        if filas is None:
-            filas = len(filas_datos)
-        if columnas is None:
-            columnas = max(len(f) for f in filas_datos)
         if tamano_celda is None:
             tamano_celda = int(datos.get("tamano_celda", TAM_CELDA))
 
+        carpeta = os.path.dirname(os.path.abspath(ruta))
+        catalogo = Catalogo.desde_json(datos, carpeta, tamano_celda)
+        filas_suelo = _buscar_capa(datos, ruta, NOMBRE_CAPAS_SUELO, obligatoria=True)
+        filas_objetos = _buscar_capa(datos, ruta, NOMBRE_CAPAS_OBJETOS, obligatoria=False)
+
+        if filas is None:
+            filas = len(filas_suelo)
+        if columnas is None:
+            columnas = max(len(f) for f in filas_suelo)
+
         # Recortar en silencio dejaria un mapa con una forma distinta de la que
         # quiere la vista, asi que un mapa que no cabe es un error, no un recorte.
-        if len(filas_datos) > filas or max(len(f) for f in filas_datos) > columnas:
+        if len(filas_suelo) > filas or max(len(f) for f in filas_suelo) > columnas:
             raise ValueError(
-                f"el mapa de {ruta} es de {max(len(f) for f in filas_datos)} x"
-                f" {len(filas_datos)} celdas y no cabe en {columnas} x {filas};"
+                f"el mapa de {ruta} es de {max(len(f) for f in filas_suelo)} x"
+                f" {len(filas_suelo)} celdas y no cabe en {columnas} x {filas};"
                 " la vista no recorta, ajusta 'tamano_celda' o el mapa"
             )
 
-        mapa = cls(columnas, filas, tamano_celda, origen_x, origen_y)
+        mapa = cls(columnas, filas, tamano_celda, origen_x, origen_y, catalogo=catalogo)
         mapa.nombre = datos.get("nombre", os.path.splitext(os.path.basename(ruta))[0])
-        mapa.catalogo = catalogo
-        mapa.terreno_defecto = _elegir_terreno_defecto(catalogo)
 
-        for numero_fila, fila in enumerate(filas_datos):
-            for numero_col, caracter in enumerate(fila):
-                if caracter not in catalogo:
+        for numero_fila, fila in enumerate(filas_suelo):
+            for numero_col, valor in enumerate(_normalizar_suelo(fila, catalogo, ruta, numero_fila)):
+                if valor not in catalogo.terreno_por_id:
                     raise ValueError(
-                        f"el mapa {ruta} usa el caracter {caracter!r} en la fila {numero_fila},"
-                        f" columna {numero_col}, que no es ningun terreno del catalogo",
+                        f"el mapa {ruta} usa el tile {valor!r} en la fila {numero_fila},"
+                        f" columna {numero_col}, que no esta en la lista de tiles"
                     )
-                mapa.celdas[numero_fila][numero_col] = caracter
+                mapa.suelo[numero_fila][numero_col] = valor
+
+        if filas_objetos is not None:
+            for numero_fila, fila in enumerate(filas_objetos[:mapa.filas]):
+                for numero_col, valor in enumerate(fila[:mapa.columnas]):
+                    valor = int(valor or OBJETO_NINGUNO)
+                    if valor == OBJETO_NINGUNO:
+                        continue
+                    if valor not in catalogo.objetos:
+                        raise ValueError(
+                            f"el mapa {ruta} usa el objeto {valor!r} en la fila"
+                            f" {numero_fila}, columna {numero_col}, que no esta en la lista"
+                        )
+                    mapa.objetos[numero_fila][numero_col] = valor
 
         if datos.get("inicio") is None:
             raise ValueError(
@@ -320,50 +353,70 @@ class MapaTerreno:
                 f"'{que}' apunta a la celda ({fila}, {col}), fuera del mapa de"
                 f" {self.filas} x {self.columnas}",
             )
-        if not self.transitable(fila, col):
-            raise ValueError(f"'{que}' apunta a la celda ({fila}, {col}), que es un obstaculo")
+        if self.bloqueada(fila, col):
+            raise ValueError(f"'{que}' apunta a la celda ({fila}, {col}), que esta bloqueada")
 
         setattr(self, que, (fila, col))
 
     # --------------------------------------------------------------- edicion
 
-    def colocar_terreno(self, fila, col, clave):
-        """Pinta un terreno. Claves desconocidas se ignoran."""
-        if not self._dentro(fila, col) or clave not in self.catalogo:
+    def colocar_terreno(self, fila, col, id_tile):
+        """Pinta un tile de suelo. IDs desconocidos se ignoran."""
+        if not self._dentro(fila, col):
             return False
-        self.celdas[fila][col] = clave
+        if id_tile not in self.catalogo.terreno_por_id:
+            return False
+        self.suelo[fila][col] = id_tile
+        return True
+
+    def colocar_terreno_clave(self, fila, col, clave):
+        """Pinta el tile base de una clave de terreno."""
+        id_tile = self.catalogo.id_base_de(clave)
+        if id_tile is None:
+            return False
+        return self.colocar_terreno(fila, col, id_tile)
+
+    def colocar_objeto(self, fila, col, id_objeto):
+        if not self._dentro(fila, col) or not self.transitable(fila, col):
+            return False
+        if id_objeto not in self.catalogo.objetos:
+            return False
+        self.objetos[fila][col] = id_objeto
+        return True
+
+    def quitar_objeto(self, fila, col):
+        if not self._dentro(fila, col) or self.objetos[fila][col] == OBJETO_NINGUNO:
+            return False
+        self.objetos[fila][col] = OBJETO_NINGUNO
         return True
 
     def limpiar_celda(self, fila, col):
-        return self.colocar_terreno(fila, col, self.terreno_defecto)
+        return self.colocar_terreno(fila, col, self.tile_defecto)
 
     def colocar_inicio(self, fila, col):
-        if not self._dentro(fila, col) or not self.transitable(fila, col):
+        if not self._dentro(fila, col) or self.bloqueada(fila, col):
             return False
         self._liberar_celda_anterior("inicio")
         self.inicio = (fila, col)
         return True
 
     def colocar_meta(self, fila, col):
-        if not self._dentro(fila, col) or not self.transitable(fila, col):
+        if not self._dentro(fila, col) or self.bloqueada(fila, col):
             return False
         self._liberar_celda_anterior("meta")
         self.meta = (fila, col)
         return True
 
     def _liberar_celda_anterior(self, que):
-        """Inicio y meta son unicos: al mover uno, su celda vuelve a terreno normal.
-
-        Antes el sitio vacio era 'celda libre'; con los terrenos no hay un estado
-        vacio, asi que la celda recupera el terreno por defecto del mapa.
-        """
+        """Inicio y meta son unicos: al mover uno, su celda recupera el suelo normal."""
         anterior = getattr(self, que)
         if anterior is not None and self._dentro(*anterior):
-            self.celdas[anterior[0]][anterior[1]] = self.terreno_defecto
+            self.suelo[anterior[0]][anterior[1]] = self.tile_defecto
         return anterior
 
     def limpiar(self):
-        self.celdas = [[self.terreno_defecto] * self.columnas for _ in range(self.filas)]
+        self.suelo = [[self.tile_defecto] * self.columnas for _ in range(self.filas)]
+        self.objetos = [[OBJETO_NINGUNO] * self.columnas for _ in range(self.filas)]
         self.marcas = [[MARCA_NINGUNA] * self.columnas for _ in range(self.filas)]
         self.inicio = None
         self.meta = None
@@ -403,19 +456,18 @@ class MapaTerreno:
 
     # ---------------------------------------------------------------- render
 
-    def _imagen_terreno(self, tipo):
-        """Textura escalada o color plano, cacheado por clave."""
-        if tipo.clave in self._imagenes:
-            return self._imagenes[tipo.clave]
+    def _imagen_tile(self, id_tile):
+        """Textura del tileset o color plano, cacheada por ID."""
+        if id_tile in self._imagenes:
+            return self._imagenes[id_tile]
 
-        if tipo.textura:
-            imagen = image.load(tipo.textura).convert_alpha()
+        imagen = self.catalogo.tile(id_tile)
+        if imagen is None:
+            imagen = self.catalogo.color_tile(id_tile)
+        elif imagen.get_size() != (self.tamano_celda, self.tamano_celda):
             imagen = transform.scale(imagen, (self.tamano_celda, self.tamano_celda))
-        else:
-            imagen = Surface((self.tamano_celda, self.tamano_celda))
-            imagen.fill(tipo.color)
 
-        self._imagenes[tipo.clave] = imagen
+        self._imagenes[id_tile] = imagen
         return imagen
 
     def _imagen_marca(self, marca):
@@ -433,17 +485,19 @@ class MapaTerreno:
         return capa
 
     def preparar_capa(self):
-        """Pre-renderiza el terreno y la rejilla, para poder blitear de una vez."""
+        """Pre-renderiza suelo y objetos, para poder blitear de una vez."""
         self._imagenes = {}
-        self.capa_terreno = Surface((self.ancho_util, self.alto_util))
-        self.capa_terreno.fill(COLOR_FONDO_MAPA)
+        self.capa_suelo = Surface((self.ancho_util, self.alto_util))
+        self.capa_suelo.fill(COLOR_FONDO_MAPA)
+        self.capa_objetos = Surface((self.ancho_util, self.alto_util), SRCALPHA)
 
         for fila in range(self.filas):
             for col in range(self.columnas):
-                self.capa_terreno.blit(
-                    self._imagen_terreno(self.terreno_en(fila, col)),
-                    (col * self.tamano_celda, fila * self.tamano_celda),
-                )
+                destino = (col * self.tamano_celda, fila * self.tamano_celda)
+                self.capa_suelo.blit(self._imagen_tile(self.suelo[fila][col]), destino)
+                objeto = self.objeto_en(fila, col)
+                if objeto is not None and objeto.imagen is not None:
+                    self.capa_objetos.blit(objeto.imagen, destino)
 
         self.capa_rejilla = Surface((self.ancho_util, self.alto_util), SRCALPHA)
         for col in range(self.columnas + 1):
@@ -453,8 +507,11 @@ class MapaTerreno:
             y = fila * self.tamano_celda
             draw.line(self.capa_rejilla, COLOR_LINEA, (0, y), (self.ancho_util, y))
 
-    def dibujar_terreno(self, superficie):
-        superficie.blit(self.capa_terreno, (self.origen_x, self.origen_y))
+    def dibujar_suelo(self, superficie):
+        superficie.blit(self.capa_suelo, (self.origen_x, self.origen_y))
+
+    def dibujar_objetos(self, superficie):
+        superficie.blit(self.capa_objetos, (self.origen_x, self.origen_y))
 
     def dibujar_rejilla(self, superficie):
         if self.mostrar_rejilla:
@@ -478,7 +535,7 @@ class MapaTerreno:
         fila, col = self.hover
         rect_hover = self.rect_celda(fila, col)
 
-        if self.transitable(fila, col):
+        if not self.bloqueada(fila, col):
             realce = Surface((self.tamano_celda, self.tamano_celda), SRCALPHA)
             realce.fill(CIAN_RESPLANDOR + (ALFA_REALCE,))
             superficie.blit(realce, rect_hover.topleft)
@@ -505,36 +562,37 @@ class MapaTerreno:
                       (centro[0], centro[1] - cruz), (centro[0], centro[1] + cruz), 2)
 
     def dibujar(self, superficie):
-        """El terreno completo, en el orden en que debe apilarse."""
-        self.dibujar_terreno(superficie)
+        """Las capas de suelo y objetos, en el orden en que deben apilarse."""
+        self.dibujar_suelo(superficie)
+        self.dibujar_objetos(superficie)
         self.dibujar_marcas(superficie)
         self.dibujar_inicio_meta(superficie)
         self.dibujar_rejilla(superficie)
 
 
-def _buscar_capa_terreno(datos, ruta):
+def _buscar_capa(datos, ruta, nombres, obligatoria):
     capas = datos.get("capas")
     if capas is None:
-        raise ValueError(f"el mapa de {ruta} no tiene 'capas'")
+        if obligatoria:
+            raise ValueError(f"el mapa de {ruta} no tiene 'capas'")
+        return None
     if not isinstance(capas, list) or not capas:
         raise ValueError(f"'capas' de {ruta} debe ser una lista no vacia")
 
     for capa in capas:
-        if isinstance(capa, dict) and str(capa.get("nombre", "")).lower() in NOMBRE_CAPAS_POR_DEFECTO:
+        if isinstance(capa, dict) and str(capa.get("nombre", "")).lower() in nombres:
             filas = capa.get("datos")
             break
     else:
-        filas = None
+        if obligatoria:
+            raise ValueError(
+                f"el mapa de {ruta} no tiene capa de suelo;"
+                f" se esperaba una llamada {nombres[0]!r}",
+            )
+        return None
 
-    if filas is None:
-        raise ValueError(
-            f"el mapa de {ruta} no tiene capa de terreno;"
-            f" se esperaba una llamada {NOMBRE_CAPAS_POR_DEFECTO[0]!r}",
-        )
     if not isinstance(filas, list) or not filas:
-        raise ValueError(f"la capa de terreno de {ruta} necesita 'datos' con al menos una fila")
-    if not all(isinstance(f, str) for f in filas):
-        raise ValueError(f"las filas de 'datos' de {ruta} deben ser cadenas de texto")
+        raise ValueError(f"la capa {nombres[0]!r} de {ruta} necesita 'datos' con al menos una fila")
 
     anchos = {len(f) for f in filas}
     if len(anchos) != 1:
@@ -544,12 +602,22 @@ def _buscar_capa_terreno(datos, ruta):
     return filas
 
 
-def _elegir_terreno_defecto(catalogo):
-    """Clave con la que se rellena lo que el JSON no define."""
-    for clave in ("t", "pavimento", "suelo"):
-        if clave in catalogo and catalogo[clave].transitable:
-            return clave
-    for clave, tipo in catalogo.items():
-        if tipo.transitable:
-            return clave
-    raise ValueError("el catalogo de terrenos no tiene ningun tipo transitable que pueda servir de relleno")
+def _normalizar_suelo(fila, catalogo, ruta, numero_fila):
+    """Acepta una fila de IDs numericos o, por compatibilidad, de caracteres."""
+    if isinstance(fila, str):
+        ids = []
+        for caracter in fila:
+            clave = CLAVE_POR_CARACTER.get(caracter)
+            id_tile = catalogo.id_base_de(clave) if clave else None
+            if id_tile is None:
+                raise ValueError(
+                    f"el mapa {ruta} usa el caracter {caracter!r} en la fila {numero_fila},"
+                    " que no es ningun terreno conocido",
+                )
+            ids.append(id_tile)
+        return ids
+
+    if isinstance(fila, list):
+        return [int(valor) for valor in fila]
+
+    raise ValueError(f"las filas de 'datos' de {ruta} deben ser listas de IDs o cadenas")

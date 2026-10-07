@@ -67,10 +67,26 @@ RUTA_FONTE = os.path.join(RUTA_FUENTES, "game.ttf")
 # audio
 RUTA_AUDIO_PRESIONAR_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "presionar_boton.ogg")
 RUTA_AUDIO_HOVER_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "hover_boton.ogg")
-    
+RUTA_AUDIO_PISADAS_HIERBA = os.path.join(RUTA_AUDIO, "pisadas_hierba.ogg")
+RUTA_AUDIO_PISADAS_PAVIMENTO = os.path.join(RUTA_AUDIO, "pisadas_pavimento.ogg")
+
 # MAPAS y texturas de terreno
 RUTA_CARPETA_TEXTURAS = os.path.join(RUTA_MAPAS, "texturas")
 RUTA_MAPA_EXPLORACION = os.path.join(RUTA_MAPAS, "exploracion.json")
+RUTA_TILESET = os.path.join(RUTA_IMAGENES, "mapa", "tileset.jpg")
+
+# Capas del mapa (mismo orden en el que se apilan)
+CAPA_SUELO = "suelo"
+CAPA_OBJETOS = "objetos"
+CAPA_ENTIDADES = "entidades"
+NOMBRE_CAPAS_SUELO = ("suelo", "terreno", "terrenos")
+NOMBRE_CAPAS_OBJETOS = ("objetos", "objectos", "cosas")
+
+# ID que representa "ningun objeto" en la capa de objetos
+OBJETO_NINGUNO = 0
+
+# Volumen con el que suenan las pisadas
+VOLUMEN_PISADAS = 0.35
 
 # Costo de referencia: el terreno mas barato se mueve a la velocidad base
 COSTO_REFERENCIA = 1.0

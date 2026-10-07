@@ -36,7 +36,14 @@ def iniciar():
         return
 
     init()
-    
+
+    # El audio es opcional: sin tarjeta de sonido o en modo headless el juego
+    # sigue funcionando, solo que sin pisadas ni botones sonoros.
+    try:
+        mixer.init()
+    except Exception:
+        pass
+
     font.init()
     
     pantalla = display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))

@@ -1,67 +1,126 @@
-"""Tipos de terreno: color, textura, si se puede pasar y cuanto cuesta pasar.
+"""Tipos de terreno orientados a objetos.
 
-Modulo de datos puros, sin pygame, como config.py y paleta.py. El recorte y el
-escalado de la textura los resuelve mapa_terreno.py, que si importa pygame.
+Cada tipo encapsula sus datos fisicos: si se puede pasar, cuanto cuesta
+recorrerlo, que intervalo tienen sus pisadas y que sonido suenan. La velocidad
+no se guarda aparte: se deriva del costo (`factor_vel`), de modo que el costo que
+alimenta a BFS/Dijkstra/A* es la unica fuente de verdad.
+
+Modulo de datos puros, sin pygame, como config.py y paleta.py. El recorte del
+tileset y la carga de sonidos los resuelve catalogo.py, que si importa pygame y
+deja el sonido ya cargado en `Terreno.sonido`.
 """
 
-import os
+from config import (
+    COSTO_REFERENCIA,
+    RUTA_AUDIO_PISADAS_HIERBA,
+    RUTA_AUDIO_PISADAS_PAVIMENTO,
+)
 
 
-class TipoTerreno:
+class Terreno:
     """Un tipo de celda del mapa.
 
     `costo` es None exactamente cuando el terreno es intransitable: un obstaculo
-    no tiene precio porque no se puede recorrer. Los transitable lo tienen siempre
-    positivo.
+    no tiene precio porque no se puede recorrer. Los transitables lo tienen
+    siempre positivo. `ruta_sonido` es la ruta del audio de pisadas; `sonido` es
+    el objeto Sound ya cargado (o None si el audio no esta disponible).
     """
 
-    def __init__(self, clave, nombre, transitable, costo, color, textura=None):
+    def __init__(
+        self,
+        clave,
+        nombre,
+        transitable,
+        costo,
+        color,
+        intervalo_pasos_ms=None,
+        ruta_sonido=None,
+    ):
         self.clave = clave
         self.nombre = nombre
         self.transitable = transitable
         self.costo = costo
         self.color = color
-        self.textura = textura
+        self.intervalo_pasos_ms = intervalo_pasos_ms
+        self.ruta_sonido = ruta_sonido
+        self.sonido = None
 
-    @classmethod
-    def desde_json(cls, datos, carpeta_base):
-        """Construye un tipo a partir de su bloque en el JSON del mapa."""
-        if not isinstance(datos, dict):
-            raise ValueError(f"cada terreno debe ser un objeto, no {type(datos).__name__}")
+    @property
+    def factor_vel(self):
+        """Factor de velocidad derivado del costo (1.0 en el terreno mas barato)."""
+        if not self.transitable or not self.costo:
+            return None
+        return COSTO_REFERENCIA / self.costo
 
-        clave = datos.get("codigo")
-        if not isinstance(clave, str) or len(clave) != 1:
-            raise ValueError(f"el terreno necesita un 'codigo' de un solo caracter, recibido: {clave!r}")
-
-        nombre = datos.get("nombre", clave)
-        if not isinstance(nombre, str) or not nombre:
-            raise ValueError(f"el terreno {clave!r} necesita un 'nombre' de texto")
-
-        transitable = bool(datos.get("transitable", True))
-        if transitable:
-            costo = datos.get("costo", 1.0)
-            if costo is None or costo <= 0:
-                raise ValueError(f"el terreno transitable {nombre!r} necesita un 'costo' mayor que cero")
-        else:
-            if datos.get("costo") is not None:
-                raise ValueError(
-                    f"el terreno intransitable {nombre!r} declara un 'costo':"
-                    " dejalo en null, porque no se puede recorrer"
-                )
-            costo = None
-
-        color = _leer_color(datos.get("color"), clave)
-
-        textura = datos.get("textura")
-        if textura is not None:
-            if not isinstance(textura, str) or not textura:
-                raise ValueError(f"la 'textura' del terreno {nombre!r} debe ser una ruta de texto o null")
-            textura = os.path.join(carpeta_base, textura.replace("\\", "/"))
-
-        return cls(clave, nombre, transitable, costo, color, textura)
+    def superficie(self, pygame_mod):
+        """Superficie plana de respaldo, cuando no hay tile en el tileset."""
+        capa = pygame_mod.Surface((32, 32))
+        capa.fill(self.color)
+        return capa
 
     def __repr__(self):
-        return f"TipoTerreno({self.clave!r}, {self.nombre!r}, transitable={self.transitable}, costo={self.costo})"
+        return (
+            f"{type(self).__name__}({self.clave!r}, {self.nombre!r},"
+            f" transitable={self.transitable}, costo={self.costo})"
+        )
+
+
+class TerrenoHierba(Terreno):
+    """Hierba: pesada y con pisadas mas espaciadas."""
+
+    def __init__(self, **alters):
+        base = dict(
+            clave="hierba",
+            nombre="Hierba",
+            transitable=True,
+            costo=2.0,
+            color=(124, 183, 66),
+            intervalo_pasos_ms=500,
+            ruta_sonido=RUTA_AUDIO_PISADAS_HIERBA,
+        )
+        base.update(alters)
+        super().__init__(**base)
+
+
+class TerrenoPavimento(Terreno):
+    """Pavimento: terreno rapido y sonido seco de pisadas."""
+
+    def __init__(self, **alters):
+        base = dict(
+            clave="pavimento",
+            nombre="Pavimento",
+            transitable=True,
+            costo=1.0,
+            color=(125, 135, 130),
+            intervalo_pasos_ms=350,
+            ruta_sonido=RUTA_AUDIO_PISADAS_PAVIMENTO,
+        )
+        base.update(alters)
+        super().__init__(**base)
+
+
+class TerrenoMuro(Terreno):
+    """Obstaculo: no se puede recorrer, sin costo ni pisadas."""
+
+    def __init__(self, **alters):
+        base = dict(
+            clave="muro",
+            nombre="Muro",
+            transitable=False,
+            costo=None,
+            color=(58, 34, 44),
+            intervalo_pasos_ms=None,
+            ruta_sonido=None,
+        )
+        base.update(alters)
+        super().__init__(**base)
+
+
+TIPOS_TERRENO = {
+    "hierba": TerrenoHierba,
+    "pavimento": TerrenoPavimento,
+    "muro": TerrenoMuro,
+}
 
 
 def _leer_color(color, clave):
@@ -79,20 +138,65 @@ def _leer_color(color, clave):
     return tuple(componentes)
 
 
+def terreno_desde_json(datos):
+    """Construye un terreno a partir de su bloque en el JSON del mapa.
+
+    La clave elige la clase; los demas campos son opcionales y sobreescriben los
+    valores por defecto de esa clase (por ejemplo, un costo distinto al original).
+    """
+    if not isinstance(datos, dict):
+        raise ValueError(f"cada terreno debe ser un objeto, no {type(datos).__name__}")
+
+    clave = datos.get("clave", datos.get("codigo"))
+    if not isinstance(clave, str) or clave not in TIPOS_TERRENO:
+        raise ValueError(
+            f"la clave de terreno {clave!r} no es ninguna conocida: {sorted(TIPOS_TERRENO)}"
+        )
+
+    alters = {}
+    if "nombre" in datos:
+        alters["nombre"] = datos["nombre"]
+    if "color" in datos:
+        alters["color"] = _leer_color(datos["color"], clave)
+    if "costo" in datos:
+        alters["costo"] = datos["costo"]
+    if "intervalo_pasos_ms" in datos:
+        alters["intervalo_pasos_ms"] = datos["intervalo_pasos_ms"]
+    if "sonido" in datos:
+        alters["ruta_sonido"] = datos["sonido"]
+
+    terreno = TIPOS_TERRENO[clave](**alters)
+    _validar(terreno)
+    return terreno
+
+
+def _validar(terreno):
+    if terreno.transitable:
+        if terreno.costo is None or terreno.costo <= 0:
+            raise ValueError(
+                f"el terreno transitable {terreno.nombre!r} necesita un 'costo' mayor que cero"
+            )
+    elif terreno.costo is not None:
+        raise ValueError(
+            f"el terreno intransitable {terreno.nombre!r} declara un 'costo':"
+            " dejalo en null, porque no se puede recorrer"
+        )
+
+
 def catalogo_por_defecto():
-    """Los tres tipos del enunciado. Los costos son editables desde el JSON."""
+    """Los tres tipos del juego. El JSON puede ajustar costo y sonidos."""
     return {
-        "p": TipoTerreno("p", "Pavimento", True, 1.0, (148, 150, 158)),
-        "t": TipoTerreno("t", "Tierra", True, 2.0, (122, 92, 63)),
-        "#": TipoTerreno("#", "Obstáculo", False, None, (58, 34, 44)),
+        "hierba": TerrenoHierba(),
+        "pavimento": TerrenoPavimento(),
+        "muro": TerrenoMuro(),
     }
 
 
-def cargar_catalogo(entradas, carpeta_base):
-    """Convierte la lista `terrenos` del JSON en un dict clave -> TipoTerreno.
+def cargar_catalogo(entradas):
+    """Convierte la lista `terrenos` del JSON en un dict clave -> Terreno.
 
     Sin entradas devuelve el catalogo por defecto. Comprueba que no haya claves
-    repetidas y que toda textura declarada exista en disco.
+    repetidas.
     """
     if not entradas:
         return catalogo_por_defecto()
@@ -102,14 +206,10 @@ def cargar_catalogo(entradas, carpeta_base):
 
     catalogo = {}
     for datos in entradas:
-        tipo = TipoTerreno.desde_json(datos, carpeta_base)
-        if tipo.clave in catalogo:
-            raise ValueError(f"el terreno {tipo.clave!r} esta definido dos veces")
-        if tipo.textura and not os.path.isfile(tipo.textura):
-            raise FileNotFoundError(
-                f"el terreno {tipo.nombre!r} declara la textura {tipo.textura!r}, que no existe",
-            )
-        catalogo[tipo.clave] = tipo
+        terreno = terreno_desde_json(datos)
+        if terreno.clave in catalogo:
+            raise ValueError(f"el terreno {terreno.clave!r} esta definido dos veces")
+        catalogo[terreno.clave] = terreno
 
     if not catalogo:
         raise ValueError("'terrenos' esta vacio: el mapa no tendria celdas")
