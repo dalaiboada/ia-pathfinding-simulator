@@ -83,6 +83,7 @@ class MapaTerreno:
 
         self._imagenes = {}
         self._imagenes_marca = {}
+        self.objetos_animados = []
         self.capa_suelo = Surface((self.ancho_util, self.alto_util))
         self.capa_objetos = Surface((self.ancho_util, self.alto_util), SRCALPHA)
         self.capa_rejilla = Surface((self.ancho_util, self.alto_util), SRCALPHA)
@@ -518,6 +519,7 @@ class MapaTerreno:
     def preparar_capa(self):
         """Pre-renderiza suelo y objetos, para poder blitear de una vez."""
         self._imagenes = {}
+        self.objetos_animados = []
         self.capa_suelo = Surface((self.ancho_util, self.alto_util))
         self.capa_suelo.fill(COLOR_FONDO_MAPA)
         self.capa_objetos = Surface((self.ancho_util, self.alto_util), SRCALPHA)
@@ -527,8 +529,11 @@ class MapaTerreno:
                 destino = (col * self.tamano_celda, fila * self.tamano_celda)
                 self.capa_suelo.blit(self._imagen_tile(self.suelo[fila][col]), destino)
                 objeto = self.objeto_en(fila, col)
-                if objeto is not None and objeto.imagen is not None:
-                    self.capa_objetos.blit(objeto.imagen, destino)
+                if objeto is not None:
+                    if hasattr(objeto, "actualizar"):
+                        self.objetos_animados.append((objeto, fila, col, destino))
+                    if objeto.imagen is not None:
+                        self.capa_objetos.blit(objeto.imagen, destino)
 
         self.capa_rejilla = Surface((self.ancho_util, self.alto_util), SRCALPHA)
         for col in range(self.columnas + 1):
@@ -540,6 +545,22 @@ class MapaTerreno:
 
     def dibujar_suelo(self, superficie):
         superficie.blit(self.capa_suelo, (self.origen_x, self.origen_y))
+
+    def actualizar_objetos_animados(self):
+        """Actualiza la animación de los objetos animados y redibuja la capa de objetos."""
+        if not self.objetos_animados:
+            return
+
+        self.capa_objetos.fill((0, 0, 0, 0))
+        for fila in range(self.filas):
+            for col in range(self.columnas):
+                destino = (col * self.tamano_celda, fila * self.tamano_celda)
+                objeto = self.objeto_en(fila, col)
+                if objeto is not None:
+                    if hasattr(objeto, "actualizar"):
+                        objeto.actualizar()
+                    if objeto.imagen is not None:
+                        self.capa_objetos.blit(objeto.imagen, destino)
 
     def dibujar_objetos(self, superficie):
         superficie.blit(self.capa_objetos, (self.origen_x, self.origen_y))

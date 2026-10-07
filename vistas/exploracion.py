@@ -176,6 +176,7 @@ class VistaExploracion(Vista):
 
     def actualizar(self):
         self.mapa.hover = self.mapa.celda_por_pos(mouse.get_pos())
+        self.mapa.actualizar_objetos_animados()
         # El deslizador se ajusta en la vista de rutas, asi que se aplica aqui:
         # exploracion es la unica vista con un jugador que saltar.
         Jugador.fijar_multiplicador(self.juego.velocidad_animacion)

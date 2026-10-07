@@ -56,6 +56,10 @@ RUTA_FONDO_MENU = os.path.join(RUTA_IMAGENES, "juego", "fondo.jpg")
 RUTA_JUGADOR = os.path.join(RUTA_IMAGENES, "juego", "ironman.png")
 RUTA_ENEMIGO = os.path.join(RUTA_IMAGENES, "juego", "ultron.png")
 
+# OBJETOS ANIMADOS
+RUTA_CARPETA_OBJETOS = os.path.join(RUTA_IMAGENES, "juego", "objetos")
+RUTA_ARBOL_ANIMADO = os.path.join(RUTA_CARPETA_OBJETOS, "Animation5.png")
+
 # INTERFAZ
 #img
 RUTA_CURSOR = os.path.join(RUTA_IMAGENES, "interfaz", "cursor.png")

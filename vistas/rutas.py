@@ -284,6 +284,7 @@ class VistaControladorRutas(Vista):
 
     def actualizar(self):
         self.mapa.hover = self.mapa.celda_por_pos(mouse.get_pos())
+        self.mapa.actualizar_objetos_animados()
         self.selector.actualizar()
         self.deslizador_velocidad.actualizar(self.juego.eventos)
         if self.deslizador_velocidad.valor != self.juego.velocidad_animacion:

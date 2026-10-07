@@ -182,6 +182,7 @@ class VistaPersecucion(Vista):
 
     def actualizar(self):
         self.mapa.hover = self.mapa.celda_por_pos(mouse.get_pos())
+        self.mapa.actualizar_objetos_animados()
         self.selector.actualizar()
         self.jugador.update()
         self.enemigos.update(self.jugador, self.juego.algoritmo_enemigo)

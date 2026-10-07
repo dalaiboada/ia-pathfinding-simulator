@@ -65,10 +65,11 @@ def _cargar_sonido(ruta, volumen):
 class Catalogo:
     """Instancias de terrenos y objetos, indexadas por clave y por ID."""
 
-    def __init__(self, terrenos, tiles, objetos, ruta_tileset=RUTA_TILESET, tamano_celda=32):
+    def __init__(self, terrenos, tiles, objetos, ruta_tileset=RUTA_TILESET, tamano_celda=32, carpeta_base=None):
         self.tamano_celda = tamano_celda
         self.ruta_tileset = ruta_tileset
         self.tileset = self._cargar_tileset()
+        self.carpeta_base = carpeta_base
 
         self.terrenos = terrenos
         for terreno in self.terrenos.values():
@@ -97,7 +98,7 @@ class Catalogo:
                 raise ValueError(f"el id de objeto {id_objeto} esta definido dos veces")
             definicion = dict(definicion)
             definicion.setdefault("tile", None)
-            self.objetos[id_objeto] = objeto_desde_json(definicion, tamano_celda, ruta_tileset)
+            self.objetos[id_objeto] = objeto_desde_json(definicion, tamano_celda, ruta_tileset, carpeta_base)
 
         self.id_defecto = self.id_base_por_terreno.get("hierba")
         if self.id_defecto is None:
@@ -106,12 +107,13 @@ class Catalogo:
     # ------------------------------------------------------------- construccion
 
     @classmethod
-    def por_defecto(cls, tamano_celda=32):
+    def por_defecto(cls, tamano_celda=32, carpeta_base=None):
         return cls(
             terrenos=catalogo_por_defecto(),
             tiles=TILES_POR_DEFECTO,
             objetos=OBJETOS_POR_DEFECTO,
             tamano_celda=tamano_celda,
+            carpeta_base=carpeta_base,
         )
 
     @classmethod
@@ -137,6 +139,7 @@ class Catalogo:
             objetos=datos.get("objetos") or [],
             ruta_tileset=ruta_tileset,
             tamano_celda=tamano_celda,
+            carpeta_base=carpeta_base,
         )
 
     def _cargar_tileset(self):
