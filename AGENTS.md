@@ -13,7 +13,7 @@ versión completa del repositorio.
 ## 1. Propósito
 
 Simulador de movimiento con rutas y movimiento de enemigos, construido para
-**apreciar el funcionamiento de los algoritmos de búsqueda** (BFS, Dijkstra, A*).
+**apreciar el funcionamiento de los algoritmos de búsqueda** (BFS, Dijkstra, A\*).
 
 En la práctica el juego es el banco de pruebas: un mapa de rejilla que se puede
 editar a mano, un jugador con hoja de animaciones, un panel de telemetría que
@@ -65,40 +65,43 @@ formas.
 
 ### Assets
 
-| Archivo | Uso |
-|---|---|
-| `assets/img/juego/fondo.jpg` | Fondo del menú (1920×1080, escalado a 1300×670) |
-| `assets/img/juego/ironman.png` | Hoja del jugador, 576×384 = rejilla 9×6 de celdas 64×64 |
-| `assets/img/juego/ultron.png` | Hoja del enemigo (reservada para Persecución) |
-| `assets/img/mapa/tileset.jpg` | Hoja de tiles 512×384 = 16×12 celdas de 32 px (suelo) |
-| `assets/img/interfaz/cursor.png` | Cursor personalizado (32×32) |
-| `assets/img/interfaz/cursor_click.png` | Rastro del cursor (32×32) |
-| `assets/fuentes/game.ttf` | Tipografía pixelada: títulos, botones, HUD |
-| `assets/audio/interfaz/presionar_boton.ogg` | Sonido de clic en botón |
-| `assets/audio/interfaz/hover_boton.ogg` | Sonido al pasar por encima de un botón |
-| `assets/audio/pisadas_pavimento.ogg` | Pisadas sobre pavimento (usado por `TerrenoPavimento`) |
-| `assets/audio/pisadas_hierba.ogg` | Pisadas sobre hierba (usado por `TerrenoHierba`) |
-| `assets/audio/interfaz/theme_menu.mp3` | Tema del menú (otorga `musica.py`, en bucle) |
-| `assets/audio/interfaz/theme_vistas.mp3` | Tema de las vistas de mapa (otorga `musica.py`, en bucle) |
-| `mapas/exploracion.json` | Mapa de la vista Exploración (esquema v2) |
-| `mapas/persecucion.json` | Mapa de la vista Persecución (esquema v2) |
-| `mapas/rutas.json` | Mapa editable de la vista Rutas (esquema v2) |
+| Archivo                                     | Uso                                                       |
+| ------------------------------------------- | --------------------------------------------------------- |
+| `assets/img/juego/fondo.jpg`                | Fondo del menú (1920×1080, escalado a 1300×670)           |
+| `assets/img/juego/ironman.png`              | Hoja del jugador, 576×384 = rejilla 9×6 de celdas 64×64   |
+| `assets/img/juego/ultron.png`               | Hoja del enemigo (reservada para Persecución)             |
+| `assets/img/mapa/tileset.jpg`               | Hoja de tiles 512×384 = 16×12 celdas de 32 px (suelo)     |
+| `assets/img/juego/objetos/Animation2.png`   | Spritesheet de árbol animado (skin 1)                     |
+| `assets/img/juego/objetos/Animation4.png`   | Spritesheet de árbol animado (skin 2)                     |
+| `assets/img/juego/objetos/Animation5.png`   | Spritesheet de árbol animado (skin 3)                     |
+| `assets/img/interfaz/cursor.png`            | Cursor personalizado (32×32)                              |
+| `assets/img/interfaz/cursor_click.png`      | Rastro del cursor (32×32)                                 |
+| `assets/fuentes/game.ttf`                   | Tipografía pixelada: títulos, botones, HUD                |
+| `assets/audio/interfaz/presionar_boton.ogg` | Sonido de clic en botón                                   |
+| `assets/audio/interfaz/hover_boton.ogg`     | Sonido al pasar por encima de un botón                    |
+| `assets/audio/pisadas_pavimento.ogg`        | Pisadas sobre pavimento (usado por `TerrenoPavimento`)    |
+| `assets/audio/pisadas_hierba.ogg`           | Pisadas sobre hierba (usado por `TerrenoHierba`)          |
+| `assets/audio/interfaz/theme_menu.mp3`      | Tema del menú (otorga `musica.py`, en bucle)              |
+| `assets/audio/interfaz/theme_vistas.mp3`    | Tema de las vistas de mapa (otorga `musica.py`, en bucle) |
+| `mapas/exploracion.json`                    | Mapa de la vista Exploración (esquema v2)                 |
+| `mapas/persecucion.json`                    | Mapa de la vista Persecución (esquema v2)                 |
+| `mapas/rutas.json`                          | Mapa editable de la vista Rutas (esquema v2)              |
 
 ### Código
 
-| Archivo | Rol | Estado |
-|---|---|---|
-| `IA.py` | **El juego.** `main()`, punto de entrada. | Activo |
-| `config.py` | Medidas, rutas de assets (tileset/audios), marcas, costo de referencia | Activo, sin pygame |
-| `paleta.py` | Colores + `mezclar()` | Activo, sin pygame |
-| `arranque.py` | `iniciar()`, `fuente()`, `comprobar_iniciado()` | Activo |
-| `dibujo.py` | Velo, rejilla, tarjeta, HUD, texto centrado | Activo |
-| `busqueda.py` | BFS, DFS, Dijkstra, A\*, Greedy y `ResultadoBusqueda` | Activo, sin pygame |
-| `motor.py` | `Juego`: bucle principal, navegación y algoritmo activo | Activo |
-| `musica.py` | Temas de fondo por vista: menú vs. vistas de mapa | Activo |
-| `mapas/exploracion.json` | Mapa de la vista Exploración | Activo, se recarga con `F5` |
-| `mapas/persecucion.json` | Mapa de la vista Persecución | Activo, se recarga con `F5` |
-| `mapas/rutas.json` | Mapa editable de la vista Rutas | Activo, se recarga con `F5` |
+| Archivo                  | Rol                                                                    | Estado                      |
+| ------------------------ | ---------------------------------------------------------------------- | --------------------------- |
+| `IA.py`                  | **El juego.** `main()`, punto de entrada.                              | Activo                      |
+| `config.py`              | Medidas, rutas de assets (tileset/audios), marcas, costo de referencia | Activo, sin pygame          |
+| `paleta.py`              | Colores + `mezclar()`                                                  | Activo, sin pygame          |
+| `arranque.py`            | `iniciar()`, `fuente()`, `comprobar_iniciado()`                        | Activo                      |
+| `dibujo.py`              | Velo, rejilla, tarjeta, HUD, texto centrado                            | Activo                      |
+| `busqueda.py`            | BFS, DFS, Dijkstra, A\*, Greedy y `ResultadoBusqueda`                  | Activo, sin pygame          |
+| `motor.py`               | `Juego`: bucle principal, navegación y algoritmo activo                | Activo                      |
+| `musica.py`              | Temas de fondo por vista: menú vs. vistas de mapa                      | Activo                      |
+| `mapas/exploracion.json` | Mapa de la vista Exploración                                           | Activo, se recarga con `F5` |
+| `mapas/persecucion.json` | Mapa de la vista Persecución                                           | Activo, se recarga con `F5` |
+| `mapas/rutas.json`       | Mapa editable de la vista Rutas                                        | Activo, se recarga con `F5` |
 
 ```
 simulador/
@@ -242,25 +245,25 @@ tiene su propia rejilla, más ancha: `ANCHO_VENTANA // TAM_CELDA` columnas y
 
 Orden de secciones, de arriba abajo:
 
-| Sección | Contenido |
-|---|---|
-| Configuración | Medidas, rutas de assets, FPS, marcas de búsqueda, costos, ritmo del deslizador |
-| Paleta | Paleta cyberpunk + `mezclar()` |
-| Arranque | `init()`, `font.init()`, `display.set_mode()`, fuentes |
-| Helpers de dibujo | `obtener_sub_cuadros`, `crear_velo`, rejilla, tarjeta, HUD |
-| Componentes | `BotonTexto`, `CustomMouse`, `DeslizadorCyber`, `Proyectil`, `Jugador`, `MapaTerreno`, `MapaRutas` |
-| Vistas | `Vista` (base) + menú, exploración, rutas, persecución |
-| Juego | `Juego` con el bucle principal, y `main()` en `IA.py` |
+| Sección           | Contenido                                                                                          |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| Configuración     | Medidas, rutas de assets, FPS, marcas de búsqueda, costos, ritmo del deslizador                    |
+| Paleta            | Paleta cyberpunk + `mezclar()`                                                                     |
+| Arranque          | `init()`, `font.init()`, `display.set_mode()`, fuentes                                             |
+| Helpers de dibujo | `obtener_sub_cuadros`, `crear_velo`, rejilla, tarjeta, HUD                                         |
+| Componentes       | `BotonTexto`, `CustomMouse`, `DeslizadorCyber`, `Proyectil`, `Jugador`, `MapaTerreno`, `MapaRutas` |
+| Vistas            | `Vista` (base) + menú, exploración, rutas, persecución                                             |
+| Juego             | `Juego` con el bucle principal, y `main()` en `IA.py`                                              |
 
 ### Punto de arranque
 
 `arranque.py` es el **único** sitio que abre la ventana. Expone:
 
-| Función | Qué hace |
-|---|---|
-| `iniciar()` | `init()`, `mixer.init()` (tolerante a fallos), `font.init()`, `set_mode()`, `set_caption()`, reloj y fuentes. Idempotente. |
-| `fuente(clave)` | Devuelve una fuente por clave; el `KeyError` lista las claves válidas. |
-| `comprobar_iniciado()` | Lanza `RuntimeError` con mensaje claro si se usa el juego antes de `iniciar()`. |
+| Función                | Qué hace                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `iniciar()`            | `init()`, `mixer.init()` (tolerante a fallos), `font.init()`, `set_mode()`, `set_caption()`, reloj y fuentes. Idempotente. |
+| `fuente(clave)`        | Devuelve una fuente por clave; el `KeyError` lista las claves válidas.                                                     |
+| `comprobar_iniciado()` | Lanza `RuntimeError` con mensaje claro si se usa el juego antes de `iniciar()`.                                            |
 
 Claves de fuente: `titulo_menu`, `subtitulo_menu`, `boton`, `hud`, `cyber_titulo`,
 `cyber_etiqueta`, `cyber_valor`, `instrucciones`, `cyber_diminuta`.
@@ -324,14 +327,14 @@ desactiva para no salirse de sí mismo.
 Hoja de 9×6 con celdas de 64×64 y seis animaciones, cada una disponible en dos
 direcciones (la de la izquierda es el espejo generado por `transform.flip`):
 
-| Estado | Fila | Cuadros | Velocidad de fotograma |
-|---|---|---|---|
-| `reposo` | 0 | 3 | 0.15 |
-| `caminar` | 1 | 6 | 0.15 |
-| `disparo` | 2 (cols 3–5) | 3 | 0.18 |
-| `agachado` | 2 (cols 6–8) | 3 | 0.15 |
-| `golpe` | 3 | 4 | 0.18 |
-| `correr` | 4 | 6 | 0.22 |
+| Estado     | Fila         | Cuadros | Velocidad de fotograma |
+| ---------- | ------------ | ------- | ---------------------- |
+| `reposo`   | 0            | 3       | 0.15                   |
+| `caminar`  | 1            | 6       | 0.15                   |
+| `disparo`  | 2 (cols 3–5) | 3       | 0.18                   |
+| `agachado` | 2 (cols 6–8) | 3       | 0.15                   |
+| `golpe`    | 3            | 4       | 0.18                   |
+| `correr`   | 4            | 6       | 0.22                   |
 
 Control por teclado (4 px/frame, 7 con `SHIFT`) o por ratón. El movimiento es
 siempre **cardinal**: un solo eje por fotograma, nunca en diagonal. Al hacer clic
@@ -365,11 +368,11 @@ Si el audio no está disponible (`Terreno.sonido is None`), no pasa nada.
 `mundo/terreno.py` define los tipos de celda **orientados a objetos**. Módulo de
 datos puros, sin pygame, como `config.py`. Cada tipo encapsula su física:
 
-| Clase | Clave | Nombre | Transitable | Costo | `factor_vel` | Pisadas |
-|---|---|---|---|---|---|---|
-| `TerrenoHierba` | `hierba` | Hierba | sí | `2.0` | `0.5` | 500 ms, `pisadas_hierba.ogg` |
-| `TerrenoPavimento` | `pavimento` | Pavimento | sí | `1.0` | `1.0` | 350 ms, `pisadas_pavimento.ogg` |
-| `TerrenoMuro` | `muro` | Muro | no | `null` | `null` | — |
+| Clase              | Clave       | Nombre    | Transitable | Costo  | `factor_vel` | Pisadas                         |
+| ------------------ | ----------- | --------- | ----------- | ------ | ------------ | ------------------------------- |
+| `TerrenoHierba`    | `hierba`    | Hierba    | sí          | `2.0`  | `0.5`        | 500 ms, `pisadas_hierba.ogg`    |
+| `TerrenoPavimento` | `pavimento` | Pavimento | sí          | `1.0`  | `1.0`        | 350 ms, `pisadas_pavimento.ogg` |
+| `TerrenoMuro`      | `muro`      | Muro      | no          | `null` | `null`       | —                               |
 
 `costo` es `None` **exactamente** cuando el terreno es intransitable, y siempre
 positivo cuando es transitable. Cargar un catálogo que rompa ese invariante es un
@@ -396,12 +399,12 @@ Sin bloque, `catalogo_por_defecto()` devuelve los tres tipos.
 Rejilla de celdas organizada en **tres capas**, como en el ejemplo de referencia
 (ya eliminado del repo):
 
-| Capa | Matriz | Contenido |
-|---|---|---|
-| Suelo | `suelo` | ID de tile del tileset (base, bordes y esquinas de pavimento). |
-| Objetos | `objetos` | ID de objeto estático (cofres) o `OBJETO_NINGUNO`. |
-| Entidades | — | Los sprites dinámicos, que dibuja la vista por encima. |
-| Búsqueda | `marcas` | `MARCA_NINGUNA` / `MARCA_VISITADA` / `MARCA_CAMINO`. |
+| Capa      | Matriz    | Contenido                                                      |
+| --------- | --------- | -------------------------------------------------------------- |
+| Suelo     | `suelo`   | ID de tile del tileset (base, bordes y esquinas de pavimento). |
+| Objetos   | `objetos` | ID de objeto estático (cofres) o `OBJETO_NINGUNO`.             |
+| Entidades | —         | Los sprites dinámicos, que dibuja la vista por encima.         |
+| Búsqueda  | `marcas`  | `MARCA_NINGUNA` / `MARCA_VISITADA` / `MARCA_CAMINO`.           |
 
 `inicio` y `meta` son **coordenadas**, no estados de celda. Se dibujan como anillos
 con cruz (`COLOR_INICIO` cian, `COLOR_META` magenta) por encima de objetos y bajo
@@ -427,11 +430,11 @@ antes de la siguiente ejecución.
 
 Métodos de colisión que usa el jugador:
 
-| Método | Qué hace |
-|---|---|
-| `superficie_libre(rect)` | El rect cabe entero y no toca suelo ni objeto sólido. |
-| `desplazar(rect, dx, dy)` | Devuelve lo que se admite, resolviendo eje a eje. |
-| `punto_libre_cerca(centro, tamaño)` | Busca a anillos crecientes un sitio válido. |
+| Método                              | Qué hace                                              |
+| ----------------------------------- | ----------------------------------------------------- |
+| `superficie_libre(rect)`            | El rect cabe entero y no toca suelo ni objeto sólido. |
+| `desplazar(rect, dx, dy)`           | Devuelve lo que se admite, resolviendo eje a eje.     |
+| `punto_libre_cerca(centro, tamaño)` | Busca a anillos crecientes un sitio válido.           |
 
 `desplazar` **devuelve** el desplazamiento y no mueve el rect: primero prueba el
 movimiento entero y, si choca, prueba X e Y por separado para que el jugador
@@ -451,9 +454,27 @@ audios, y traduce los IDs de las matrices:
 base `1`, bordes `2–5`, esquinas `6–9`, muro `100`, cofre `101`).
 `Catalogo.desde_json()` lo construye desde el bloque `tiles` del mapa.
 
-`mundo/objetos.py` define `ObjetoMapa` (base: `es_solido`, `imagen`,
-`interactuar()`) y `ObjetoCofre` (sólido e interactivo). La imagen se toma del
-tileset si el JSON declara `tile: [col, fila]`; si no, hay un dibujo procedural.
+`mundo/objetos.py` define:
+
+- `ObjetoMapa` (base: `es_solido`, `imagen`, `interactuar()`)
+- `ObjetoCofre` (sólido e interactivo)
+- `ObjetoAnimado` (base para objetos con spritesheets animados)
+- `ObjetoArbol` (árbol animado, sólido, con spritesheet de 6×3 frames)
+
+La imagen estática se toma del tileset si el JSON declara `tile: [col, fila]`;
+si no, hay un dibujo procedural. Para objetos animados, se usa `spritesheet`
+con la ruta del archivo PNG (relativa a la carpeta del mapa o absoluta).
+
+**Objetos animados:** `ObjetoAnimado` carga spritesheets divididos en filas y columnas,
+extrae los frames con `subsurface` y actualiza `imagen` en cada `actualizar()`. Cada
+instancia mantiene su propio índice de animación. `MapaTerreno.actualizar_objetos_animados()`
+llama a `actualizar()` en todos los objetos animados y reconstruye `capa_objetos`
+para que se reflejen los nuevos frames en la renderización.
+
+`MapaTerreno` rastrea objetos animados en una lista (`objetos_animados`) que se
+construye al cargar el mapa: cualquier objeto cuya clase herede de `ObjetoAnimado`
+se agrega automáticamente. Las vistas (`exploracion.py`, `persecucion.py`, `rutas.py`)
+llaman a `mapa.actualizar_objetos_animados()` en su ciclo `actualizar()`.
 
 ### Formato del JSON
 
@@ -463,16 +484,48 @@ tileset si el JSON declara `tile: [col, fila]`; si no, hay un dibujo procedural.
   "nombre": "Patio de pruebas",
   "tamano_celda": 32,
   "tileset": "../assets/img/mapa/tileset.jpg",
-  "terrenos": [ { "clave": "hierba", "costo": 2.0, "intervalo_pasos_ms": 500 } ],
-  "tiles":    [ { "id": 0, "terreno": "hierba", "col": 0, "fila": 0 },
-                { "id": 3, "terreno": "pavimento", "col": 6, "fila": 4, "giro": 180 } ],
-  "objetos":  [ { "id": 101, "tipo": "cofre", "solido": true } ],
-  "capas":    [ { "nombre": "suelo",   "datos": [[0, 1, 1, 0], [0, 0, 100, 0]] },
-                { "nombre": "objetos", "datos": [[0, 0, 0, 0], [0, 101, 0, 0]] } ],
+  "terrenos": [{ "clave": "hierba", "costo": 2.0, "intervalo_pasos_ms": 500 }],
+  "tiles": [
+    { "id": 0, "terreno": "hierba", "col": 0, "fila": 0 },
+    { "id": 3, "terreno": "pavimento", "col": 6, "fila": 4, "giro": 180 }
+  ],
+  "objetos": [
+    { "id": 101, "tipo": "cofre", "solido": true },
+    {
+      "id": 102,
+      "tipo": "arbol_animado",
+      "spritesheet": "../assets/img/juego/objetos/Animation5.png",
+      "solido": true
+    }
+  ],
+  "capas": [
+    {
+      "nombre": "suelo",
+      "datos": [
+        [0, 1, 1, 0],
+        [0, 0, 100, 0]
+      ]
+    },
+    {
+      "nombre": "objetos",
+      "datos": [
+        [0, 0, 0, 0],
+        [0, 101, 0, 0]
+      ]
+    }
+  ],
   "inicio": { "fila": 0, "col": 0 },
-  "meta":   { "fila": 1, "col": 3 }
+  "meta": { "fila": 1, "col": 3 }
 }
 ```
+
+**Objetos animados en JSON:** además de `tipo` y `solido`, pueden incluir:
+
+- `spritesheet`: ruta al PNG con la hoja de animación (relativa a la carpeta del mapa o absoluta)
+- `tile`: opcional, para imagen estática del tileset (se ignora si hay spritesheet)
+
+Para objetos estáticos (como `cofre`), `tile` es opcional; si no se proporciona, se usa
+un dibujo procedural. Para objetos animados, `spritesheet` es obligatorio.
 
 Decisiones que conviene no cambiar sin pensarlo:
 
@@ -511,14 +564,14 @@ de una "rejilla" que exponga `filas`, `columnas`, `bloqueada(fila, col)` y
 `costo_en(fila, col)` (coste de **entrar** en la celda). El movimiento es cardinal
 (4 vecinos), igual que el del jugador.
 
-| Función | Optimiza | Notas |
-|---|---|---|
-| `buscar_bfs` | nº de pasos | Ignora el coste. |
-| `buscar_dfs` | — | Rápido, caminos largos y sinuosos. |
-| `buscar_dijkstra` | coste real | No se expone en la UI. |
-| `buscar_astar` | coste real | `coste` + heurística Manhattan (`COSTO_MINIMO` admisible). |
-| `buscar_greedy` | — | Solo heurística; rápido, no óptimo. |
-| `buscar(algoritmo, rejilla, inicio, meta)` | — | Despacha; `ValueError` si el nombre no existe. |
+| Función                                    | Optimiza    | Notas                                                      |
+| ------------------------------------------ | ----------- | ---------------------------------------------------------- |
+| `buscar_bfs`                               | nº de pasos | Ignora el coste.                                           |
+| `buscar_dfs`                               | —           | Rápido, caminos largos y sinuosos.                         |
+| `buscar_dijkstra`                          | coste real  | No se expone en la UI.                                     |
+| `buscar_astar`                             | coste real  | `coste` + heurística Manhattan (`COSTO_MINIMO` admisible). |
+| `buscar_greedy`                            | —           | Solo heurística; rápido, no óptimo.                        |
+| `buscar(algoritmo, rejilla, inicio, meta)` | —           | Despacha; `ValueError` si el nombre no existe.             |
 
 `ALGORITMOS = ("astar", "bfs", "dfs", "greedy")` es lo que ofrece la UI;
 `NOMBRES_ALGORITMO` da las etiquetas. `buscar` devuelve un `ResultadoBusqueda` con
@@ -562,12 +615,14 @@ cambia el tema en cada navegación y no reinicia una pista que ya está sonando;
 el `mixer` no está disponible o falta el archivo, se queda en silencio sin romper.
 
 ### Menú
+
 Fondo `assets/img/juego/fondo.jpg` con un velo degradado para dar legibilidad al
 texto. Tres botones `BotonTexto` que enlazan con `juego.ir_a(...)`. Cada botón
 tarda 400 ms en su animación de destello antes de navegar. Los botones suenan al
 pasar por encima y al hacer clic (`hover_boton.ogg` / `presionar_boton.ogg`).
 
 ### Exploración
+
 El patio de pruebas. El mapa sale de `mapas/exploracion.json` (17 filas × 40
 columnas) y se recarga con `F5`.
 
@@ -582,6 +637,7 @@ Si el JSON falta o está roto, avisa por consola y dibuja un patio de respaldo
 generado por código.
 
 ### Controlador de rutas
+
 El reparto pedido en el enunciado: mapa **más ancho** que el panel.
 
 - **Mapa** (izquierda, 960 px): rejilla 30×17 = 510 celdas, que carga
@@ -592,15 +648,15 @@ El reparto pedido en el enunciado: mapa **más ancho** que el panel.
 
 Reparto vertical del panel:
 
-| Banda | Y | Altura |
-|---|---|---|
-| Título y estado | 18 – 68 | — |
-| Selector de algoritmo | 92 | 30 |
-| Paleta de 3 terrenos | 138 | 34 |
-| 6 tarjetas, paso 56 | 184 → 512 | 48 |
-| Divisor | 522 | — |
-| Etiqueta de velocidad | 536 | — |
-| Deslizador | 566 | 10 |
+| Banda                 | Y         | Altura |
+| --------------------- | --------- | ------ |
+| Título y estado       | 18 – 68   | —      |
+| Selector de algoritmo | 92        | 30     |
+| Paleta de 3 terrenos  | 138       | 34     |
+| 6 tarjetas, paso 56   | 184 → 512 | 48     |
+| Divisor               | 522       | —      |
+| Etiqueta de velocidad | 536       | —      |
+| Deslizador            | 566       | 10     |
 
 Un `SelectorCyber` de 4 opciones (A\*, BFS, DFS, Greedy) elige el algoritmo del
 personaje; escribirlo en `juego.algoritmo_busqueda`. `ESPACIO` ejecuta la búsqueda
@@ -618,6 +674,7 @@ ID base; `B` recalcula los bordes y esquinas de todo el pavimento. El clic derec
 restaura el suelo por defecto y borra el objeto de la celda.
 
 ### Persecución
+
 El jugador escapa por un mapa real de 3 capas (carga `mapas/persecucion.json`, se
 recarga con `F5`, con respaldo generado por código si falta) y 5 enemigos arrancan
 en fila por la parte superior. El clic izquierdo lanza al jugador con el algoritmo
@@ -634,27 +691,27 @@ de `ultron.png`.
 
 ## 8. Controles
 
-| Vista | Entrada | Efecto |
-|---|---|---|
-| Menú | Clic en botón | Navega a la vista correspondiente (tras 400 ms) |
-| Todas | `ESC` | Vuelve al menú |
-| Todas | `TAB` | Muestra u oculta la rejilla (oculta por defecto) |
-| Exploración | Clic izquierdo | Planifica una ruta con el algoritmo activo hasta el cursor |
-| Exploración | `WASD` / flechas | Movimiento cardinal libre (se ignora mientras hay ruta) |
-| Exploración | `SHIFT` | Correr |
-| Exploración | `J` / `K` / `C` | Disparar / golpear / agacharse |
-| Rutas | Clic izquierdo | Pinta el terreno/objeto elegido en la paleta |
-| Rutas | Clic derecho | Restaura el suelo y borra el objeto de la celda |
-| Rutas | Selector | Elige el algoritmo que usa el personaje |
-| Rutas | `ESPACIO` | Ejecuta la búsqueda `inicio` → `meta` y anima la ruta |
-| Rutas | `1` / `2` | Coloca inicio / meta en la celda bajo el ratón |
-| Rutas | `B` | Recalcula bordes y esquinas del pavimento |
-| Rutas | `R` | Limpia el mapa |
-| Rutas | Deslizador | Ritmo del jugador y de sus animaciones (ver §9) |
-| Persecución | Clic izquierdo | Lanza al jugador por la ruta hasta el cursor |
-| Persecución | Selector | Elige la IA de los enemigos (incluye "Ninguno") |
-| Exploración / Persecución | `F5` | Recarga el mapa de la vista activa |
-| Rutas | `F5` | Recarga `mapas/rutas.json` |
+| Vista                     | Entrada          | Efecto                                                     |
+| ------------------------- | ---------------- | ---------------------------------------------------------- |
+| Menú                      | Clic en botón    | Navega a la vista correspondiente (tras 400 ms)            |
+| Todas                     | `ESC`            | Vuelve al menú                                             |
+| Todas                     | `TAB`            | Muestra u oculta la rejilla (oculta por defecto)           |
+| Exploración               | Clic izquierdo   | Planifica una ruta con el algoritmo activo hasta el cursor |
+| Exploración               | `WASD` / flechas | Movimiento cardinal libre (se ignora mientras hay ruta)    |
+| Exploración               | `SHIFT`          | Correr                                                     |
+| Exploración               | `J` / `K` / `C`  | Disparar / golpear / agacharse                             |
+| Rutas                     | Clic izquierdo   | Pinta el terreno/objeto elegido en la paleta               |
+| Rutas                     | Clic derecho     | Restaura el suelo y borra el objeto de la celda            |
+| Rutas                     | Selector         | Elige el algoritmo que usa el personaje                    |
+| Rutas                     | `ESPACIO`        | Ejecuta la búsqueda `inicio` → `meta` y anima la ruta      |
+| Rutas                     | `1` / `2`        | Coloca inicio / meta en la celda bajo el ratón             |
+| Rutas                     | `B`              | Recalcula bordes y esquinas del pavimento                  |
+| Rutas                     | `R`              | Limpia el mapa                                             |
+| Rutas                     | Deslizador       | Ritmo del jugador y de sus animaciones (ver §9)            |
+| Persecución               | Clic izquierdo   | Lanza al jugador por la ruta hasta el cursor               |
+| Persecución               | Selector         | Elige la IA de los enemigos (incluye "Ninguno")            |
+| Exploración / Persecución | `F5`             | Recarga el mapa de la vista activa                         |
+| Rutas                     | `F5`             | Recarga `mapas/rutas.json`                                 |
 
 ---
 
@@ -710,8 +767,8 @@ reintroducen, conviene que sigan comprobando, como mínimo:
   A\* respetan la interfaz de la rejilla, `buscar_camino` pinta visitados y camino,
   y `rejilla_para(64)` bloquea lo que no cabe.
 - La persecución: los enemigos solo se mueven tras ver al jugador (campo de visión
-  + línea de visión), con `"ninguno"` en línea recta y con un algoritmo rodeando
-  obstáculos.
+  - línea de visión), con `"ninguno"` en línea recta y con un algoritmo rodeando
+    obstáculos.
 - Las pisadas: `terreno_bajo()` devuelve el terreno correcto bajo los pies y el
   temporizador respeta `intervalo_pasos_ms`.
 - El deslizador: que el porcentaje escale el paso real, el ritmo de los cuadros y
