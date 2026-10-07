@@ -78,6 +78,8 @@ formas.
 | `assets/audio/interfaz/hover_boton.ogg` | Sonido al pasar por encima de un botón |
 | `assets/audio/pisadas_pavimento.ogg` | Pisadas sobre pavimento (usado por `TerrenoPavimento`) |
 | `assets/audio/pisadas_hierba.ogg` | Pisadas sobre hierba (usado por `TerrenoHierba`) |
+| `assets/audio/interfaz/theme_menu.mp3` | Tema del menú (otorga `musica.py`, en bucle) |
+| `assets/audio/interfaz/theme_vistas.mp3` | Tema de las vistas de mapa (otorga `musica.py`, en bucle) |
 | `mapas/exploracion.json` | Mapa de la vista Exploración (esquema v2) |
 | `mapas/persecucion.json` | Mapa de la vista Persecución (esquema v2) |
 | `mapas/rutas.json` | Mapa editable de la vista Rutas (esquema v2) |
@@ -93,6 +95,7 @@ formas.
 | `dibujo.py` | Velo, rejilla, tarjeta, HUD, texto centrado | Activo |
 | `busqueda.py` | BFS, DFS, Dijkstra, A\*, Greedy y `ResultadoBusqueda` | Activo, sin pygame |
 | `motor.py` | `Juego`: bucle principal, navegación y algoritmo activo | Activo |
+| `musica.py` | Temas de fondo por vista: menú vs. vistas de mapa | Activo |
 | `mapas/exploracion.json` | Mapa de la vista Exploración | Activo, se recarga con `F5` |
 | `mapas/persecucion.json` | Mapa de la vista Persecución | Activo, se recarga con `F5` |
 | `mapas/rutas.json` | Mapa editable de la vista Rutas | Activo, se recarga con `F5` |
@@ -107,6 +110,7 @@ simulador/
 ├── dibujo.py                      velo, rejilla, tarjeta, HUD, texto centrado
 ├── busqueda.py                    BFS, DFS, Dijkstra, A*, Greedy       (sin pygame)
 ├── motor.py                       Juego: bucle principal, navegación y algoritmo
+├── musica.py                      temas de fondo: theme_menu.mp3 / theme_vistas.mp3
 ├── assets/
 │   ├── img/
 │   │   ├── juego/                 fondo.jpg, ironman.png, ultron.png
@@ -287,7 +291,8 @@ interfaz.deslizador     → paleta
 interfaz.selector       → arranque, paleta
 vistas.base             → nada
 vistas.*                → arranque, busqueda, config, paleta, dibujo, y lo que necesitan
-motor                   → arranque, config, vistas, interfaz.cursor
+motor                   → arranque, config, vistas, interfaz.cursor, musica
+musica                  → config                                 (pygame: mixer.music)
 IA.py                   → motor, arranque
 ```
 
@@ -406,7 +411,9 @@ defecto (`_liberar_celda_anterior`).
 `preparar_capa()` pre-renderiza `capa_suelo` y `capa_objetos`. El orden de apilado
 es suelo → objetos → marcas → inicio/meta → rejilla → entidades. La rejilla
 (`mostrar_rejilla`) arranca **oculta** por defecto y cada vista la alterna con
-`TAB`; `F5` conserva el estado.
+`TAB`; `F5` conserva el estado. Las **marcas de la búsqueda** (visitados/camino)
+solo se dibujan si la rejilla está visible: `dibujar_marcas` no pinta nada cuando
+`mostrar_rejilla` es `False`.
 
 **Colisión:** una celda está `bloqueada` si su suelo es intransitable **o** si
 contiene un objeto sólido (`objeto.es_solido`). `superficie_libre`, `desplazar` y
@@ -548,6 +555,11 @@ visión libre (Bresenham); a partir de ahí **queda alerta para siempre**. Con
 ---
 
 ## 7. Las cuatro vistas
+
+`musica.py` da a cada pantalla su tema de fondo en bucle: `theme_menu.mp3` suena
+solo en el menú y `theme_vistas.mp3` en las tres vistas de mapa. `Juego.ir_a()`
+cambia el tema en cada navegación y no reinicia una pista que ya está sonando; si
+el `mixer` no está disponible o falta el archivo, se queda en silencio sin romper.
 
 ### Menú
 Fondo `assets/img/juego/fondo.jpg` con un velo degradado para dar legibilidad al

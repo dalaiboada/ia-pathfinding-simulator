@@ -549,6 +549,8 @@ class MapaTerreno:
             superficie.blit(self.capa_rejilla, (self.origen_x, self.origen_y))
 
     def dibujar_marcas(self, superficie):
+        if not self.mostrar_rejilla:
+            return
         for fila in range(self.filas):
             for col in range(self.columnas):
                 marca = self.marcas[fila][col]

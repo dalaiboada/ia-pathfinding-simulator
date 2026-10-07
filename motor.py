@@ -3,6 +3,7 @@
 from pygame import *
 
 import arranque
+import musica
 from config import (
     ALGORITMO_ENEMIGO_INICIAL,
     ALGORITMO_INICIAL,
@@ -45,6 +46,7 @@ class Juego:
             
         self.vista = self.vistas[nombre]
         self.vista.entrar()
+        musica.iniciar_tema(nombre)
 
     def ejecutar(self):
         ejecutando = True

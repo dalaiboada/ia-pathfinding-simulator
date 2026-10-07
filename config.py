@@ -68,6 +68,10 @@ RUTA_FONTE = os.path.join(RUTA_FUENTES, "game.ttf")
 RUTA_AUDIO_PRESIONAR_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "presionar_boton.mp3")
 RUTA_AUDIO_HOVER_BOTON = os.path.join(RUTA_AUDIO, "interfaz", "hover_boton.mp3")
 
+# temas
+RUTA_TEMA_MENU = os.path.join(RUTA_AUDIO, "interfaz", "theme_menu.mp3")
+RUTA_TEMA_VISTAS = os.path.join(RUTA_AUDIO, "interfaz", "theme_vistas.mp3")
+
 RUTA_AUDIO_PISADAS_HIERBA = os.path.join(RUTA_AUDIO, "juego", "pisadas_hierba.mp3")
 RUTA_AUDIO_PISADAS_PAVIMENTO = os.path.join(RUTA_AUDIO,"juego", "pisadas_pavimento.mp3")
 
@@ -89,7 +93,11 @@ NOMBRE_CAPAS_OBJETOS = ("objetos", "objectos", "cosas")
 OBJETO_NINGUNO = 0
 
 # Volumen con el que suenan las pisadas
-VOLUMEN_PISADAS = 0.35
+VOLUMEN_PISADAS = 0.9
+
+# Volumen de la musica de fondo (el tema de las vistas mas bajo que el menu)
+VOLUMEN_TEMA_MENU = 1.5
+VOLUMEN_TEMA_VISTAS = 0.3
 
 # Costo de referencia: el terreno mas barato se mueve a la velocidad base
 COSTO_REFERENCIA = 1.0
